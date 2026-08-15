@@ -1,0 +1,98 @@
+// Entry point of the preview page.
+//
+// Everything the daemon sends is raw Markdown; parsing, highlighting, DOM
+// patching and scrolling all happen here.
+import { createHighlighter } from "./highlight";
+import { createMarkdown } from "./markdown";
+import { patch } from "./patch";
+import { scrollToLine } from "./scroll";
+
+type RefreshEvent = {
+  content: string;
+  line?: number | null;
+  viewportRatio?: number | null;
+};
+
+type ScrollEvent = {
+  line: number;
+  viewportRatio?: number | null;
+};
+
+const container = document.getElementById("mop-content") as HTMLElement;
+const statusEl = document.getElementById("mop-status") as HTMLElement;
+const docId = document.body.dataset.docId ?? "";
+
+function showStatus(text: string): void {
+  statusEl.textContent = text;
+  statusEl.hidden = text === "";
+}
+
+function readInitialContent(): string {
+  const el = document.getElementById("mop-initial");
+  if (!el?.textContent) return "";
+  try {
+    return (JSON.parse(el.textContent) as { content?: string }).content ?? "";
+  } catch {
+    return "";
+  }
+}
+
+// Diagram rendering is out of scope for the prototype: no mermaid bundle is
+// shipped yet. markdown.ts already emits <pre class="mermaid"> and patch.ts
+// already knows how to leave a drawn element alone, so plugging a renderer in
+// means filling this function and setting data-mop-rendered/data-mop-source
+// on what it draws.
+function drawDiagrams(): void {}
+
+async function main(): Promise<void> {
+  // The highlighter is built once, before the first render, so every render
+  // afterwards is a synchronous call and the page never repaints in stages.
+  const highlighter = await createHighlighter();
+  const md = createMarkdown(highlighter);
+
+  const render = (content: string) => {
+    patch(container, md.render(content));
+    drawDiagrams();
+  };
+
+  render(readInitialContent());
+  connect(render);
+}
+
+function connect(render: (content: string) => void): void {
+  const source = new EventSource(`/doc/${docId}/events`);
+  let closed = false;
+
+  source.addEventListener("open", () => showStatus(""));
+
+  source.addEventListener("refresh", (ev) => {
+    const msg = JSON.parse((ev as MessageEvent<string>).data) as RefreshEvent;
+    render(msg.content);
+    // A refresh without a line comes from the file watcher. Moving the
+    // viewport then would fight with whoever is reading the page.
+    if (typeof msg.line === "number") {
+      scrollToLine(container, msg.line, msg.viewportRatio);
+    }
+    showStatus("");
+  });
+
+  source.addEventListener("scroll", (ev) => {
+    const msg = JSON.parse((ev as MessageEvent<string>).data) as ScrollEvent;
+    scrollToLine(container, msg.line, msg.viewportRatio);
+  });
+
+  source.addEventListener("close", () => {
+    closed = true;
+    source.close();
+    showStatus("closed");
+  });
+
+  source.addEventListener("error", () => {
+    if (closed) return;
+    // EventSource reconnects by itself, and the reconnect brings a full
+    // refresh, so there is no state to repair here.
+    showStatus("reconnecting…");
+  });
+}
+
+void main();
