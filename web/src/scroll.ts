@@ -7,6 +7,15 @@ const DEFAULT_VIEWPORT_RATIO = 0.5;
 
 type Anchor = { line: number; top: number };
 
+// Scrolling is animated, whatever the distance: the movement itself is what
+// tells the reader where the view went. The only exception is the reader
+// having asked the OS for less motion.
+function scrollBehavior(): ScrollBehavior {
+  const reduced =
+    window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+  return reduced ? "auto" : "smooth";
+}
+
 function anchors(container: HTMLElement): Anchor[] {
   const found: Anchor[] = [];
   for (const el of container.querySelectorAll<HTMLElement>("[data-source-line]")) {
@@ -53,5 +62,10 @@ export function scrollToLine(
     y = (prev ?? next!).top;
   }
 
-  window.scrollTo({ top: Math.max(0, y - window.innerHeight * r) });
+  // A smooth scroll already in flight is retargeted rather than queued, so
+  // repeated events from a moving cursor stay responsive.
+  window.scrollTo({
+    top: Math.max(0, y - window.innerHeight * r),
+    behavior: scrollBehavior(),
+  });
 }
