@@ -8,6 +8,7 @@ import (
 	"os"
 
 	"github.com/ryym/mop/internal/api"
+	"github.com/ryym/mop/internal/client"
 	"github.com/ryym/mop/internal/state"
 )
 
@@ -15,6 +16,20 @@ func newFlagSet(name string) *flag.FlagSet {
 	fs := flag.NewFlagSet(name, flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
 	return fs
+}
+
+var errNoDaemon = errors.New("no preview is running")
+
+// connectExisting talks to a daemon that is already running, and refuses to
+// start one. Only `open` (and `daemon start`) may bring a daemon up: update,
+// scroll and close all need a document that is already registered, so
+// starting a fresh daemon could not make them succeed. It would only add a
+// multi second stall to what an editor integration calls on every keystroke.
+func connectExisting() (*client.Client, error) {
+	if _, err := state.Load(); errors.Is(err, state.ErrNoState) {
+		return nil, errNoDaemon
+	}
+	return state.Connect()
 }
 
 // positionFlags are the --line / --viewport-ratio pair shared by update and
@@ -83,7 +98,7 @@ func runUpdate(args []string) error {
 	if err != nil {
 		return err
 	}
-	c, err := state.Connect()
+	c, err := connectExisting()
 	if err != nil {
 		return err
 	}
@@ -105,7 +120,7 @@ func runScroll(args []string) error {
 	if pos.line < 1 {
 		return errors.New("--line is required and must be 1 or greater")
 	}
-	c, err := state.Connect()
+	c, err := connectExisting()
 	if err != nil {
 		return err
 	}
@@ -122,7 +137,10 @@ func runClose(args []string) error {
 	if err != nil {
 		return err
 	}
-	c, err := state.Connect()
+	c, err := connectExisting()
+	if errors.Is(err, errNoDaemon) {
+		return nil // Nothing is open, so there is nothing to close.
+	}
 	if err != nil {
 		return err
 	}
@@ -137,13 +155,13 @@ func runList(args []string) error {
 	}
 
 	// Listing must not start a daemon: with none running, nothing is open.
-	if _, err := state.Load(); errors.Is(err, state.ErrNoState) {
+	c, err := connectExisting()
+	if errors.Is(err, errNoDaemon) {
 		if *asJSON {
 			fmt.Println(`{"docs":[]}`)
 		}
 		return nil
 	}
-	c, err := state.Connect()
 	if err != nil {
 		return err
 	}
