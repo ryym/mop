@@ -1,0 +1,86 @@
+# mop
+
+Markdown ファイルをブラウザでリアルタイムプレビューする CLI ツール。
+
+現状はプロトタイプ。
+
+## ビルド
+
+Markdown の解釈はブラウザ側で行うため、フロントのバンドルを先に作る必要がある。
+Go だけではビルドが完結しないので **`go install` は非対応**。
+
+```sh
+make build            # bun install → bun build → go build
+make VERSION=0.1.0 build
+```
+
+Bun と Go が必要。生成物は `./mop`。
+
+## 使い方
+
+```sh
+# プレビューを開く（必要ならサーバーが自動起動する）
+mop open README.md
+
+# 表示位置をソース行で指定する
+mop scroll README.md --line 42
+mop scroll README.md --line 42 --viewport-ratio 0.35
+
+# 未保存の内容をプレビューする
+cat README.md | mop update README.md --line 42
+
+# 一覧・後始末
+mop list
+mop close README.md
+```
+
+ポートや URL を意識する必要はない。開いているブラウザが 0 の状態が 10 分続くとサーバーは自動終了する。
+
+サーバーを明示的に扱う場合:
+
+```sh
+mop daemon start [--port 7654] [--foreground]
+mop daemon stop
+```
+
+## 構成
+
+単一バイナリで、CLI とプレビュー用サーバー（デーモン）を兼ねる。
+**デーモンは Markdown を解釈しない。** 生テキストを配信するだけで、パース・ハイライト・DOM 反映はすべてブラウザが行う。
+
+```
+cmd/mop/            エントリポイント
+internal/cli/       サブコマンドの実装
+internal/client/    制御 API の HTTP クライアント
+internal/api/       制御 API のリクエスト・レスポンス型
+internal/daemon/    HTTP サーバー、ドキュメント管理、SSE
+internal/watch/     fsnotify のラッパー
+internal/state/     状態ファイル、デーモンの起動・生存確認
+web/src/            ブラウザ側の TypeScript と CSS
+web/dist/           バンドル結果（生成物。Git 管理しない）
+```
+
+状態ファイルとログは `$XDG_STATE_HOME/mop`（既定では `~/.local/state/mop`）に置かれる。
+
+### ブラウザ側
+
+| 役割           | 使うもの                                  |
+| -------------- | ----------------------------------------- |
+| Markdown       | markdown-it（`html: false`）              |
+| ハイライト     | shiki（JS RegExp エンジン、WASM 不使用）  |
+| DOM 更新       | morphdom                                  |
+
+サニタイズは markdown-it の `html: false` のみで担保している。**この設定を外す変更は、サニタイズ方針そのものの変更**として扱うこと。
+
+## テスト
+
+```sh
+make test       # go test ./... と bun test
+```
+
+## プロトタイプでの制限
+
+- shiki に載せている言語は javascript / rust / shell のみ。それ以外はハイライトなしのコードブロックになる
+- Mermaid / KaTeX は未対応。mermaid のコードフェンスは `<pre class="mermaid">` として出力され、morphdom 側の描画済みスキップも実装済みだが、描画ライブラリは同梱していない
+- Windows は未対応（デーモンのバックグラウンド起動に `setsid` を使っている）
+- ブラウザ上での見た目（スクロール補間、morphdom によるパッチ）は手動確認のみ
