@@ -88,7 +88,12 @@ func (s *Server) Run(ctx context.Context) error {
 	}
 	defer s.watcher.Close()
 
-	if err := state.Save(state.State{Port: s.port, PID: os.Getpid(), Version: version.Version}); err != nil {
+	if err := state.Save(state.State{
+		Port:    s.port,
+		PID:     os.Getpid(),
+		Version: version.Version,
+		Build:   state.BuildID(),
+	}); err != nil {
 		return fmt.Errorf("failed to write state file: %w", err)
 	}
 	defer s.clearState()

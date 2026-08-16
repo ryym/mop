@@ -4,6 +4,7 @@ package state
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -17,6 +18,27 @@ type State struct {
 	Port    int    `json:"port"`
 	PID     int    `json:"pid"`
 	Version string `json:"version"`
+	// Build identifies the binary the daemon is running from. See BuildID.
+	Build string `json:"build"`
+}
+
+// BuildID fingerprints the running executable.
+//
+// A daemon serves the JS and CSS embedded in the binary it started from, so a
+// rebuilt binary changes nothing until the daemon is restarted. Version alone
+// does not catch this: during development every build is "dev". Comparing the
+// executable's identity does, and the failure it prevents is the same one the
+// version check exists for - an old daemon quietly serving stale assets.
+func BuildID() string {
+	exe, err := os.Executable()
+	if err != nil {
+		return ""
+	}
+	info, err := os.Stat(exe)
+	if err != nil {
+		return ""
+	}
+	return fmt.Sprintf("%s:%d:%d", exe, info.ModTime().UnixNano(), info.Size())
 }
 
 // Dir is the directory holding the state file and the log.

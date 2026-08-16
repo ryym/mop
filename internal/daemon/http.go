@@ -213,6 +213,7 @@ func (s *Server) handlePage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-store")
 	err = s.page.Execute(w, map[string]any{
 		"Title":   filepath.Base(d.path),
 		"ID":      d.id,
@@ -320,6 +321,10 @@ func (s *Server) handleStatic(w http.ResponseWriter, r *http.Request) {
 	case ".css":
 		w.Header().Set("Content-Type", "text/css; charset=utf-8")
 	}
+	// The asset URLs never change, so a cached bundle would survive a daemon
+	// that was restarted precisely to pick up a new one. Revalidating on
+	// localhost costs nothing.
+	w.Header().Set("Cache-Control", "no-store")
 	_, _ = w.Write(data)
 }
 

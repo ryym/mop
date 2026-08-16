@@ -22,8 +22,9 @@ const startupTimeout = 5 * time.Second
 // The sequence follows the daemon spec:
 //  1. no state file -> start a daemon
 //  2. state file but nothing answering -> discard it and start a daemon
-//  3. version mismatch -> stop the old daemon and start a new one, because a
-//     stale binary would otherwise fail in confusing, protocol-shaped ways
+//  3. version or build mismatch -> stop the old daemon and start a new one,
+//     because a stale binary would otherwise fail in confusing, protocol
+//     shaped ways, or serve the assets it was built with
 func Connect() (*client.Client, error) {
 	s, err := Load()
 	if errors.Is(err, ErrNoState) {
@@ -39,7 +40,7 @@ func Connect() (*client.Client, error) {
 		_ = Clear()
 		return startAndWait(api.DefaultPort)
 	}
-	if status.Version != version.Version {
+	if status.Version != version.Version || s.Build != BuildID() {
 		_ = c.Shutdown()
 		waitGone(c)
 		_ = Clear()
