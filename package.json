@@ -3,8 +3,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "bun build web/src/main.ts --outdir web/dist --entry-naming mop.js --chunk-naming [name]-[hash].js --splitting --format esm --minify && bun build web/src/mop.css --outfile web/dist/mop.css --minify",
-    "test": "bun test"
+    "build": "bun run clean:web && bun build web/src/main.ts --outdir web/dist --entry-naming mop.js --chunk-naming [name]-[hash].js --splitting --format esm --minify && bun build web/src/mop.css --outfile web/dist/mop.css --minify",
+    "test": "bun test",
+    "clean:web": "find web/dist -type f ! -name .gitkeep -delete"
   },
   "dependencies": {
     "@shikijs/langs": "^3.0.0",

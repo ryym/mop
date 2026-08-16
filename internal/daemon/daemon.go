@@ -56,6 +56,9 @@ func New(opts Options) (*Server, error) {
 	if log == nil {
 		log = slog.New(slog.NewTextHandler(os.Stderr, nil))
 	}
+	if err := web.CheckBundle(); err != nil {
+		return nil, err
+	}
 	page, err := template.New("page").Parse(web.PageTemplate)
 	if err != nil {
 		return nil, err

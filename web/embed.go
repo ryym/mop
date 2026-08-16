@@ -10,6 +10,8 @@ package web
 import (
 	"embed"
 	_ "embed"
+	"errors"
+	"io/fs"
 )
 
 // all: is needed so the committed .gitkeep counts as a match on a checkout
@@ -20,3 +22,16 @@ var Dist embed.FS
 
 //go:embed page.html
 var PageTemplate string
+
+// CheckBundle reports whether the frontend bundle made it into the binary.
+//
+// The embed pattern above matches the directory even when it holds nothing but
+// .gitkeep, so a binary built without running the bundler looks fine until the
+// preview page comes up blank. Failing at startup, with the command to run,
+// beats debugging that in the browser.
+func CheckBundle() error {
+	if _, err := fs.Stat(Dist, "dist/mop.js"); err != nil {
+		return errors.New("the frontend bundle is missing from this binary; build with `make build`")
+	}
+	return nil
+}
