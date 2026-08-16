@@ -37,7 +37,10 @@ function escapeHtml(s: string): string {
     .replace(/"/g, "&quot;");
 }
 
-export function createMarkdown(highlighter: Highlighter): MarkdownIt {
+export function createMarkdown(
+  highlighter: Highlighter,
+  assetBase: string,
+): MarkdownIt {
   const md = new MarkdownIt({
     // Required. Raw HTML in the source is never turned into HTML, and that is
     // what makes a separate sanitizer unnecessary. Changing this flag is a
@@ -60,7 +63,40 @@ export function createMarkdown(highlighter: Highlighter): MarkdownIt {
 
   md.use(taskLists, { label: true });
   addSourceLines(md);
+  addAssetPaths(md, assetBase);
   return md;
+}
+
+// addAssetPaths points relative image sources at the daemon's asset endpoint.
+//
+// The page lives at /doc/<id>, so a bare "img.png" would resolve to
+// /doc/img.png, which is not a route. The file actually sits next to the
+// document, and the daemon serves that directory under /doc/<id>/asset/.
+//
+// Paths that climb out of the document's directory are left alone: the daemon
+// serves the base directory only, so rewriting them would just produce a
+// different 404.
+function addAssetPaths(md: MarkdownIt, assetBase: string): void {
+  const original =
+    md.renderer.rules.image ??
+    ((tokens, idx, options, _env, self) =>
+      self.renderToken(tokens, idx, options));
+
+  md.renderer.rules.image = (tokens, idx, options, env, self) => {
+    const token = tokens[idx]!;
+    const src = token.attrGet("src");
+    if (src !== null && isRelativeAsset(src)) {
+      token.attrSet("src", assetBase + src.replace(/^\.\//, ""));
+    }
+    return original(tokens, idx, options, env, self);
+  };
+}
+
+function isRelativeAsset(src: string): boolean {
+  if (src === "" || src.startsWith("/") || src.startsWith("#")) return false;
+  if (src.startsWith("../")) return false;
+  // Anything with a scheme (http:, data:, file:) or protocol relative.
+  return !/^[a-z][a-z0-9+.-]*:/i.test(src) && !src.startsWith("//");
 }
 
 // addSourceLines wraps the renderer rules so block elements carry the source

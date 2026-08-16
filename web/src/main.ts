@@ -42,7 +42,7 @@ async function main(): Promise<void> {
   // The highlighter is built once, before the first render, so every render
   // afterwards is a synchronous call and the page never repaints in stages.
   const highlighter = await createHighlighter();
-  const md = createMarkdown(highlighter);
+  const md = createMarkdown(highlighter, `/doc/${docId}/asset/`);
 
   const render = (content: string) => {
     patch(container, md.render(content));

@@ -305,6 +305,10 @@ func (s *Server) handleAsset(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusForbidden, "asset is outside the document directory")
 		return
 	}
+	// Revalidate rather than serve from cache: an image edited next to the
+	// document has to show up in the preview. ServeFile still answers 304
+	// while the file is unchanged.
+	w.Header().Set("Cache-Control", "no-cache")
 	http.ServeFile(w, r, resolved)
 }
 

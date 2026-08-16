@@ -2,7 +2,7 @@ import { expect, test } from "bun:test";
 import { createHighlighter } from "./highlight";
 import { createMarkdown } from "./markdown";
 
-const md = createMarkdown(await createHighlighter());
+const md = createMarkdown(await createHighlighter(), "/doc/abc123/asset/");
 
 test("block elements carry 1 based source lines", () => {
   const html = md.render("# Title\n\ntext\n\n- item\n");
@@ -20,6 +20,22 @@ test("raw HTML in the source is not turned into HTML", () => {
 test("a loaded language is highlighted, an unknown one is not", () => {
   expect(md.render("```js\nconst a = 1;\n```\n")).toContain("shiki");
   expect(md.render("```nosuchlang\nx\n```\n")).not.toContain("shiki");
+});
+
+test("relative images point at the document's asset endpoint", () => {
+  const html = md.render("![a](img.png)\n\n![b](./sub/x.png)\n");
+  expect(html).toContain('src="/doc/abc123/asset/img.png"');
+  expect(html).toContain('src="/doc/abc123/asset/sub/x.png"');
+});
+
+test("absolute and escaping image sources are left alone", () => {
+  const html = md.render(
+    "![a](https://example.com/x.png)\n\n![b](/x.png)\n\n![c](../x.png)\n\n![d](data:image/png;base64,AA)\n",
+  );
+  expect(html).toContain('src="https://example.com/x.png"');
+  expect(html).toContain('src="/x.png"');
+  expect(html).toContain('src="../x.png"');
+  expect(html).toContain('src="data:image/png;base64,AA"');
 });
 
 test("mermaid fences are left for the browser to draw", () => {
