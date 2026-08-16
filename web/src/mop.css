@@ -121,18 +121,22 @@ hr {
 /*
  * shiki emits both themes at once as CSS variables (defaultColor: false),
  * so the theme follows prefers-color-scheme without re-highlighting.
+ *
+ * Only the token colors are taken from the theme. Its background is ignored
+ * on purpose: github-light's is plain white, which would make a highlighted
+ * block indistinguishable from the page while an unhighlighted one kept the
+ * --mop-code-bg of the `pre` rule above. Every code block now shares that
+ * one background.
  */
 .shiki,
 .shiki span {
   color: var(--shiki-light);
-  background-color: var(--shiki-light-bg);
 }
 
 @media (prefers-color-scheme: dark) {
   .shiki,
   .shiki span {
     color: var(--shiki-dark);
-    background-color: var(--shiki-dark-bg);
   }
 }
 
