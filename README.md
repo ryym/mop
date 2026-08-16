@@ -69,6 +69,7 @@ web/dist/           バンドル結果（生成物。Git 管理しない）
 | Markdown       | markdown-it（`html: false`）              |
 | ハイライト     | shiki（JS RegExp エンジン、WASM 不使用）  |
 | DOM 更新       | morphdom                                  |
+| 図の描画       | mermaid（図がある文書でのみ遅延ロード）   |
 
 サニタイズは markdown-it の `html: false` のみで担保している。**この設定を外す変更は、サニタイズ方針そのものの変更**として扱うこと。
 
@@ -107,6 +108,7 @@ make test       # go test ./... と bun test
 ## プロトタイプでの制限
 
 - shiki に載せている言語は javascript / rust / shell のみ。それ以外はハイライトなしのコードブロックになる
-- Mermaid / KaTeX は未対応。mermaid のコードフェンスは `<pre class="mermaid">` として出力され、morphdom 側の描画済みスキップも実装済みだが、描画ライブラリは同梱していない
+- KaTeX は未対応
+- mermaid のテーマ（light/dark）はロード時に一度決まる。OS のテーマを切り替えても描画済みの図は追従しない
 - Windows は未対応（デーモンのバックグラウンド起動に `setsid` を使っている）
 - ブラウザ上での見た目（スクロール補間、morphdom によるパッチ）は手動確認のみ

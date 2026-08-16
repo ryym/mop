@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "bun build web/src/main.ts --outfile web/dist/mop.js --minify && bun build web/src/mop.css --outfile web/dist/mop.css --minify",
+    "build": "bun build web/src/main.ts --outdir web/dist --entry-naming mop.js --chunk-naming [name]-[hash].js --splitting --format esm --minify && bun build web/src/mop.css --outfile web/dist/mop.css --minify",
     "test": "bun test"
   },
   "dependencies": {
@@ -11,6 +11,7 @@
     "@shikijs/themes": "^3.0.0",
     "markdown-it": "^14.1.0",
     "markdown-it-task-lists": "^2.1.1",
+    "mermaid": "^11.16.1",
     "morphdom": "^2.7.5",
     "shiki": "^3.0.0"
   },

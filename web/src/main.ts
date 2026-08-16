@@ -2,6 +2,7 @@
 //
 // Everything the daemon sends is raw Markdown; parsing, highlighting, DOM
 // patching and scrolling all happen here.
+import { drawDiagrams } from "./diagram";
 import { createHighlighter } from "./highlight";
 import { createMarkdown } from "./markdown";
 import { patch } from "./patch";
@@ -37,13 +38,6 @@ function readInitialContent(): string {
   }
 }
 
-// Diagram rendering is out of scope for the prototype: no mermaid bundle is
-// shipped yet. markdown.ts already emits <pre class="mermaid"> and patch.ts
-// already knows how to leave a drawn element alone, so plugging a renderer in
-// means filling this function and setting data-mop-rendered/data-mop-source
-// on what it draws.
-function drawDiagrams(): void {}
-
 async function main(): Promise<void> {
   // The highlighter is built once, before the first render, so every render
   // afterwards is a synchronous call and the page never repaints in stages.
@@ -52,7 +46,9 @@ async function main(): Promise<void> {
 
   const render = (content: string) => {
     patch(container, md.render(content));
-    drawDiagrams();
+    // Diagrams are drawn after the patch, and their loading is not waited
+    // for: the text should not be held back by a diagram library.
+    void drawDiagrams(container);
   };
 
   render(readInitialContent());

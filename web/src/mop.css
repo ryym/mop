@@ -140,6 +140,26 @@ hr {
   }
 }
 
+/*
+ * A drawn diagram is an <svg> inside the <pre> that held its source, so the
+ * code block styling has to be undone once it is drawn.
+ */
+pre.mermaid[data-mop-rendered="1"] {
+  background: none;
+  padding: 0;
+  text-align: center;
+}
+
+pre.mermaid[data-mop-rendered="1"] svg {
+  max-width: 100%;
+  height: auto;
+}
+
+/* A diagram that failed to parse keeps showing its source. */
+pre.mermaid.mop-diagram-error {
+  border-left: 3px solid #d1242f;
+}
+
 /* Minimal indicator: reconnecting / closed. No toolbar, no settings. */
 #mop-status {
   position: fixed;

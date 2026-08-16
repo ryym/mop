@@ -30,4 +30,4 @@ fmt:
 
 clean:
 	rm -f mop
-	rm -f web/dist/mop.js web/dist/mop.css
+	find web/dist -type f ! -name .gitkeep -delete
