@@ -14,15 +14,15 @@ let g:loaded_mop = 1
 
 let g:mop_command = get(g:, 'mop_command', 'mop')
 
-" Edits and cursor movement fire far more often than a preview can be useful,
-" so both are coalesced with a timer.
+" Edits and scrolling fire far more often than a preview can be useful, so
+" both are coalesced with a timer.
 let g:mop_update_delay = get(g:, 'mop_update_delay', 150)
 let g:mop_scroll_delay = get(g:, 'mop_scroll_delay', 60)
 
-" Where the focused line is placed in the preview window. A negative value
-" means "mirror the cursor's position within the editor window", which keeps
-" the two views feeling like one.
-let g:mop_viewport_ratio = get(g:, 'mop_viewport_ratio', -1)
+" Where the tracked line is placed in the preview window. The tracked line is
+" the top of the editor window, so 0.0 puts the two viewports at the same
+" place; raise it to leave some context above.
+let g:mop_viewport_ratio = get(g:, 'mop_viewport_ratio', 0.0)
 
 " bufnr -> {path, line, ratio, update_timer, scroll_timer}
 let s:sessions = {}
@@ -112,16 +112,13 @@ function! s:on_stderr_vim(ch, msg) abort
   endif
 endfunction
 
-" s:position records where the cursor is right now. It is captured at event
-" time because the timer callback below may run while another buffer is
-" current.
-function! s:position() abort
-  let l:ratio = g:mop_viewport_ratio
-  if l:ratio < 0
-    let l:height = winheight(0)
-    let l:ratio = l:height > 0 ? (line('.') - line('w0')) * 1.0 / l:height : 0.5
-  endif
-  return {'line': line('.'), 'ratio': s:clamp(l:ratio)}
+" What is tracked is the top line of the window, not the cursor. Moving the
+" cursor around within the visible region does not change what the reader is
+" looking at, so the preview must not twitch along with it. The value is read
+" at event time because the timer callback below may run while another buffer
+" is current.
+function! s:viewline() abort
+  return line('w0')
 endfunction
 
 function! s:clamp(ratio) abort
@@ -140,9 +137,8 @@ function! s:record(bufnr) abort
   if empty(l:session)
     return {}
   endif
-  let l:pos = s:position()
-  let l:session.line = l:pos.line
-  let l:session.ratio = l:pos.ratio
+  let l:session.line = s:viewline()
+  let l:session.ratio = s:clamp(g:mop_viewport_ratio)
   return l:session
 endfunction
 
@@ -159,11 +155,18 @@ function! s:on_change(bufnr) abort
         \ g:mop_update_delay, {-> s:flush_update(a:bufnr)})
 endfunction
 
-function! s:on_move(bufnr) abort
-  let l:session = s:record(a:bufnr)
+function! s:on_scroll(bufnr) abort
+  let l:session = get(s:sessions, a:bufnr, {})
   if empty(l:session)
     return
   endif
+  " The event also fires for resizes, horizontal scrolling and (on the
+  " fallback path) plain cursor movement. Nothing is sent unless the visible
+  " region actually moved.
+  if s:viewline() ==# l:session.line
+    return
+  endif
+  call s:record(a:bufnr)
   " While an update is pending it will carry the newest position anyway.
   if l:session.update_timer >= 0
     return
@@ -236,19 +239,28 @@ function! s:open() abort
 
   let s:sessions[l:bufnr] = {
         \ 'path': l:path,
-        \ 'line': line('.'),
-        \ 'ratio': 0.5,
+        \ 'line': s:viewline(),
+        \ 'ratio': s:clamp(g:mop_viewport_ratio),
         \ 'open_job': l:job,
         \ 'update_timer': -1,
         \ 'scroll_timer': -1,
         \ }
+  " Sync the position once, so :Mop in an already scrolled buffer does not
+  " leave the preview sitting at the top until something else happens.
+  let s:sessions[l:bufnr].scroll_timer = timer_start(
+        \ g:mop_scroll_delay, {-> s:flush_scroll(l:bufnr)})
 
   execute 'augroup mop_buffer_' . l:bufnr
     autocmd!
     execute 'autocmd TextChanged,TextChangedI,InsertLeave <buffer=' . l:bufnr
           \ . '> call s:on_change(' . l:bufnr . ')'
-    execute 'autocmd CursorMoved,CursorMovedI <buffer=' . l:bufnr
-          \ . '> call s:on_move(' . l:bufnr . ')'
+    " WinScrolled is registered globally below. CursorMoved is only needed as
+    " a fallback for editors that lack it; s:on_scroll drops the events that
+    " did not move the visible region either way.
+    if !exists('##WinScrolled')
+      execute 'autocmd CursorMoved,CursorMovedI <buffer=' . l:bufnr
+            \ . '> call s:on_scroll(' . l:bufnr . ')'
+    endif
     execute 'autocmd BufUnload,BufWipeout <buffer=' . l:bufnr
           \ . '> call s:close(' . l:bufnr . ')'
   augroup END
@@ -295,6 +307,12 @@ augroup mop_global
   autocmd!
   " Leaving the editor should not leave documents registered in the daemon.
   autocmd VimLeavePre * call s:close_all()
+  " WinScrolled's pattern matches the window, not the buffer, so it cannot be
+  " registered per buffer. It is harmless while nothing is being previewed:
+  " s:on_scroll returns immediately when the buffer has no session.
+  if exists('##WinScrolled')
+    autocmd WinScrolled * call s:on_scroll(bufnr('%'))
+  endif
 augroup END
 
 " Buffers are usually unloaded before this runs, so there is normally nothing
