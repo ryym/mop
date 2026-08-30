@@ -1,114 +1,95 @@
 # mop
 
-Markdown ファイルをブラウザでリアルタイムプレビューする CLI ツール。
+Live Markdown preview in the browser, driven from the command line.
 
-現状はプロトタイプ。
+`mop open README.md` opens a preview that follows the file as you edit it. An
+editor can push unsaved buffer contents and the current scroll position, so the
+preview stays in step with what you are looking at.
 
-## ビルド
+## Build
 
-Markdown の解釈はブラウザ側で行うため、フロントのバンドルを先に作る必要がある。
-Go だけではビルドが完結しないので **`go install` は非対応**。
+There are no prebuilt binaries yet, so mop is built from source. Go and
+[Bun](https://bun.sh/) are needed for that, and for nothing else: the frontend
+bundle is embedded in the binary, which has no runtime dependencies of its own.
+
+The browser does the Markdown rendering, so that bundle must be built before Go
+embeds it. **`go install` is not supported**, because the bundle is generated
+output and is not committed: `go install` builds from the module source alone
+and never runs Bun.
 
 ```sh
-make build            # bun install → bun build → go build
-make VERSION=0.1.0 build
+make build                # bun install -> bun build -> go build
+make VERSION=0.1.0 build  # stamp a version into the binary
 ```
 
-Bun と Go が必要。生成物は `./mop`。
+The result is `./mop`: a single binary, plus a browser to view the preview in.
+Linux and macOS only; Windows is not supported yet.
 
-## 使い方
+## Usage
 
 ```sh
-# プレビューを開く（必要ならサーバーが自動起動する）
+# Open a preview. A daemon is started if none is running.
 mop open README.md
 
-# 表示位置をソース行で指定する
+# Move the preview to a source line.
 mop scroll README.md --line 42
 mop scroll README.md --line 42 --viewport-ratio 0.35
 
-# 未保存の内容をプレビューする
+# Preview content that has not been saved yet.
 cat README.md | mop update README.md --line 42
 
-# 一覧・後始末
+# Inspect and clean up.
 mop list
 mop close README.md
 ```
 
-ポートや URL を意識する必要はない。開いているブラウザが 0 の状態が 10 分続くとサーバーは自動終了する。
-
-サーバーを明示的に扱う場合:
+Ports and URLs never need to be typed. The daemon shuts itself down after ten
+minutes with no browser connected, and it can also be managed explicitly:
 
 ```sh
 mop daemon start [--port 7654] [--foreground]
 mop daemon stop
 ```
 
-## 構成
+## Vim / Neovim
 
-単一バイナリで、CLI とプレビュー用サーバー（デーモン）を兼ねる。
-**デーモンは Markdown を解釈しない。** 生テキストを配信するだけで、パース・ハイライト・DOM 反映はすべてブラウザが行う。
-
-```
-cmd/mop/            エントリポイント
-internal/cli/       サブコマンドの実装
-internal/client/    制御 API の HTTP クライアント
-internal/api/       制御 API のリクエスト・レスポンス型
-internal/daemon/    HTTP サーバー、ドキュメント管理、SSE
-internal/watch/     fsnotify のラッパー
-internal/state/     状態ファイル、デーモンの起動・生存確認
-web/src/            ブラウザ側の TypeScript と CSS
-web/dist/           バンドル結果（生成物。Git 管理しない）
-```
-
-状態ファイルとログは `$XDG_STATE_HOME/mop`（既定では `~/.local/state/mop`）に置かれる。
-
-### ブラウザ側
-
-| 役割           | 使うもの                                  |
-| -------------- | ----------------------------------------- |
-| Markdown       | markdown-it（`html: false`）              |
-| ハイライト     | shiki（JS RegExp エンジン、WASM 不使用）  |
-| DOM 更新       | morphdom                                  |
-| 図の描画       | mermaid（図がある文書でのみ遅延ロード）   |
-
-サニタイズは markdown-it の `html: false` のみで担保している。**この設定を外す変更は、サニタイズ方針そのものの変更**として扱うこと。
-
-## Vim / Neovim から使う
-
-`editor/mop.vim` を source するだけ。プラグインマネージャは不要。
+Source `editor/mop.vim`; no plugin manager is involved.
 
 ```vim
 source /path/to/mop/editor/mop.vim
-let g:mop_command = '/path/to/mop/mop'   " PATH に無い場合
+let g:mop_command = '/path/to/mop/mop'   " when mop is not on PATH
 ```
 
-| コマンド    | 動作                                                     |
-| ----------- | -------------------------------------------------------- |
-| `:Mop`      | 現在のバッファのプレビューを開き、以降の同期を開始する   |
-| `:MopClose` | 同期を止め、プレビューを閉じる                           |
+| Command     | Effect                                                 |
+| ----------- | ------------------------------------------------------ |
+| `:Mop`      | Open a preview of the current buffer and start syncing |
+| `:MopClose` | Stop syncing and close the preview                     |
 
-`:Mop` 以降は、バッファの編集が `mop update` で（**保存前の内容がそのまま**）、ウィンドウのスクロールが `mop scroll` で送られる。
-バッファを閉じるか Vim を終了すると自動で `mop close` される。
+After `:Mop`, buffer edits are sent with `mop update` (**including unsaved
+text**) and the window's view with `mop scroll`, so the preview follows where
+the window scrolls to. Closing the buffer or quitting Vim runs `mop close`
+automatically.
 
-**追従するのはカーソルではなくウィンドウの表示位置**（`line('w0')`）。表示範囲が変わらない限り、その中でカーソルをどれだけ動かしてもプレビューは動かない。
+| Variable               | Default | Meaning                                 |
+| ---------------------- | ------- | --------------------------------------- |
+| `g:mop_command`        | `mop`   | Command to run                          |
+| `g:mop_update_delay`   | 150     | Debounce before sending an edit (ms)    |
+| `g:mop_scroll_delay`   | 60      | Debounce before sending a scroll (ms)   |
+| `g:mop_viewport_ratio` | 0.0     | Where in the viewport to place the line |
 
-| 変数                   | 既定  | 意味                                                    |
-| ---------------------- | ----- | ------------------------------------------------------- |
-| `g:mop_command`        | `mop` | 実行するコマンド                                        |
-| `g:mop_update_delay`   | 150   | 編集を送るまでのデバウンス (ms)                         |
-| `g:mop_scroll_delay`   | 60    | スクロールを送るまでのデバウンス (ms)                   |
-| `g:mop_viewport_ratio` | 0.0   | 画面内のどこに合わせるか。0.0 で両者の表示上端が揃う    |
-
-## テスト
+## Test
 
 ```sh
-make test       # go test ./... と bun test
+make test   # go test ./... and bun test
 ```
 
-## プロトタイプでの制限
+## Documentation
 
-- shiki に載せている言語は javascript / rust / shell のみ。それ以外はハイライトなしのコードブロックになる
-- KaTeX は未対応
-- mermaid のテーマ（light/dark）はロード時に一度決まる。OS のテーマを切り替えても描画済みの図は追従しない
-- Windows は未対応（デーモンのバックグラウンド起動に `setsid` を使っている）
-- ブラウザ上での見た目（スクロール補間、morphdom によるパッチ）は手動確認のみ
+- [docs/architecture.md](docs/architecture.md) — how the CLI, daemon and
+  browser divide the work, and why.
+- [docs/frontend.md](docs/frontend.md) — the preview page: rendering, DOM
+  patching and scroll synchronisation.
+
+## Current limitations
+
+- Windows is not supported (the daemon is detached with `setsid`).
