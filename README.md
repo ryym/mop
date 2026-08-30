@@ -22,7 +22,7 @@ make build                # bun install -> bun build -> go build
 make VERSION=0.1.0 build  # stamp a version into the binary
 ```
 
-The result is `./mop`: a single binary, plus a browser to view the preview in.
+The result is `bin/mop`: a single binary, plus a browser to view the preview in.
 Linux and macOS only; Windows is not supported yet.
 
 ## Usage

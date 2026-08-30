@@ -24,7 +24,7 @@ check-web:
 	}
 
 go: check-web
-	go build -ldflags "$(LDFLAGS)" -o mop ./cmd/mop
+	go build -ldflags "$(LDFLAGS)" -o bin/mop ./cmd/mop
 
 test: test-go test-web
 
@@ -38,5 +38,5 @@ fmt:
 	gofmt -w .
 
 clean:
-	rm -f mop
+	rm -f bin/mop
 	find web/dist -type f ! -name .gitkeep -delete
