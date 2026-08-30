@@ -1,8 +1,7 @@
 // Package api holds the request and response types of the control API.
 //
 // It exists so that the daemon (server) and the client agree on one
-// definition. The package list in the architecture doc does not mention it;
-// the alternative was duplicating the structs in both packages.
+// definition; the alternative was duplicating the structs in both packages.
 package api
 
 // DefaultPort is the fixed port the daemon listens on unless told otherwise.

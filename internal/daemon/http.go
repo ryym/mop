@@ -15,21 +15,26 @@ import (
 	"github.com/ryym/mop/web"
 )
 
+// handler wires up the two surfaces the daemon serves: the control plane under
+// /api/, spoken by the CLI, and the preview surface, spoken by the browser.
+// Documents are named by absolute path on the former and by id on the latter.
 func (s *Server) handler() http.Handler {
 	mux := http.NewServeMux()
 
-	mux.HandleFunc("POST /api/doc/open", s.handleOpen)
-	mux.HandleFunc("POST /api/doc/update", s.handleUpdate)
-	mux.HandleFunc("POST /api/doc/scroll", s.handleScroll)
-	mux.HandleFunc("POST /api/doc/close", s.handleClose)
-	mux.HandleFunc("GET /api/docs", s.handleDocs)
-	mux.HandleFunc("POST /api/shutdown", s.handleShutdown)
-	mux.HandleFunc("GET /api/status", s.handleStatus)
+	// Control plane. Requests and responses are the types in internal/api.
+	mux.HandleFunc("POST /api/doc/open", s.handleOpen)     // register a document, return its preview URL
+	mux.HandleFunc("POST /api/doc/update", s.handleUpdate) // replace the content, optionally focusing a line
+	mux.HandleFunc("POST /api/doc/scroll", s.handleScroll) // move the preview to a source line
+	mux.HandleFunc("POST /api/doc/close", s.handleClose)   // unregister and tell the browser it is closed
+	mux.HandleFunc("GET /api/docs", s.handleDocs)          // list open documents
+	mux.HandleFunc("POST /api/shutdown", s.handleShutdown) // stop the daemon
+	mux.HandleFunc("GET /api/status", s.handleStatus)      // version, port, uptime; also the liveness probe
 
-	mux.HandleFunc("GET /doc/{id}", s.handlePage)
-	mux.HandleFunc("GET /doc/{id}/events", s.handleEvents)
-	mux.HandleFunc("GET /doc/{id}/asset/{path...}", s.handleAsset)
-	mux.HandleFunc("GET /static/", s.handleStatic)
+	// Preview surface.
+	mux.HandleFunc("GET /doc/{id}", s.handlePage)                  // the preview page
+	mux.HandleFunc("GET /doc/{id}/events", s.handleEvents)         // its SSE stream
+	mux.HandleFunc("GET /doc/{id}/asset/{path...}", s.handleAsset) // local files next to the document
+	mux.HandleFunc("GET /static/", s.handleStatic)                 // the embedded bundle
 
 	return s.checkRequest(mux)
 }
