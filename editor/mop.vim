@@ -215,6 +215,10 @@ endfunction
 function! s:open() abort
   let l:bufnr = bufnr('%')
   let l:path = expand('%:p')
+  if &filetype !=# 'markdown'
+    call s:error('not a markdown buffer')
+    return
+  endif
   if empty(l:path)
     call s:error('this buffer has no file name')
     return
