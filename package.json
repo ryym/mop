@@ -11,6 +11,7 @@
   "dependencies": {
     "@shikijs/langs": "^3.0.0",
     "@shikijs/themes": "^3.0.0",
+    "github-markdown-css": "^5.9.0",
     "markdown-it": "^14.1.0",
     "markdown-it-task-lists": "^2.1.1",
     "mermaid": "^11.16.1",
