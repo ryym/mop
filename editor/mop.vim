@@ -265,7 +265,11 @@ function! s:open() abort
       execute 'autocmd CursorMoved,CursorMovedI <buffer=' . l:bufnr
             \ . '> call s:on_scroll(' . l:bufnr . ')'
     endif
-    execute 'autocmd BufUnload,BufWipeout <buffer=' . l:bufnr
+    " BufUnload also fires when ":e" reloads this same file (buffer contents
+    " are freed and re-read, but the buffer itself survives), so closing on
+    " it would drop the session on every reload. BufWipeout only fires when
+    " the buffer is actually gone.
+    execute 'autocmd BufWipeout <buffer=' . l:bufnr
           \ . '> call s:close(' . l:bufnr . ')'
   augroup END
 
