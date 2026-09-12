@@ -53,3 +53,18 @@ The daemon sends a source line; only the page knows what that is in pixels. The
 line is located among the tagged elements, interpolated between them when no
 element starts exactly there, and placed in the viewport according to the ratio
 the caller asked for.
+
+## Style preview
+
+`web/src/mop.css` is otherwise only visible through a running daemon, which
+means a rebuild and a restart for every change. `make dev-style` serves
+`web/dev/` instead: `sample.md` — one document holding every construct the
+stylesheet has a rule for — rendered through the real pipeline, with the
+stylesheet loaded from source and hot reloaded on save.
+
+Only the rendering is real. The document never changes there, so nothing after
+markdown-it applies: no event stream, no DOM patching, no scroll
+synchronisation. Those are still verified by hand in an actual preview.
+
+`web/dev/index.html` repeats the skeleton of `web/page.html`, so the two move
+together: an element or id that changes in the page changes there as well.

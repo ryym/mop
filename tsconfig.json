@@ -10,5 +10,5 @@
     "skipLibCheck": true,
     "noEmit": true
   },
-  "include": ["web/src"]
+  "include": ["web/src", "web/dev"]
 }

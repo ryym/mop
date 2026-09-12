@@ -1,7 +1,7 @@
 VERSION ?= dev
 LDFLAGS := -X github.com/ryym/mop/internal/version.Version=$(VERSION)
 
-.PHONY: build web go check-web test test-go test-web fmt clean
+.PHONY: build web dev-style go check-web test test-go test-web fmt clean
 
 # The frontend bundle must exist before the Go build embeds it, so `go build`
 # alone is never enough. That is also why `go install` is unsupported.
@@ -9,6 +9,11 @@ build: web go
 
 web: node_modules
 	bun run build
+
+# The style preview: web/src/mop.css against a fixture document, with hot
+# reload and without the daemon. See docs/frontend.md.
+dev-style: node_modules
+	bun run dev:style
 
 node_modules: package.json bun.lock
 	bun install

@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>mop style preview</title>
+    <!-- The stylesheet under test, straight from source: `bun run dev:style`
+         hot reloads it on save. -->
+    <link rel="stylesheet" href="../src/mop.css" />
+  </head>
+  <body>
+    <header id="mop-title">web/dev/sample.md</header>
+    <main id="mop-content"></main>
+    <!-- Not hidden, unlike the real page: the indicator is only ever visible
+         mid-reconnect, so this is the only place its styling can be seen. -->
+    <div id="mop-status">reconnecting…</div>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>
