@@ -4,7 +4,7 @@
 // patching and scrolling all happen here.
 import { drawDiagrams } from "./diagram";
 import { createHighlighter } from "./highlight";
-import { createMarkdown } from "./markdown";
+import { collectFenceLanguages, createMarkdown } from "./markdown";
 import { patch } from "./patch";
 import { scrollToLine } from "./scroll";
 
@@ -44,32 +44,37 @@ async function main(): Promise<void> {
   const highlighter = await createHighlighter();
   const md = createMarkdown(highlighter, `/doc/${docId}/asset/`);
 
-  const render = (content: string) => {
+  const render = async (content: string) => {
+    // Shiki grammars are loaded lazily, so whatever the fences in this
+    // content need has to be in before the synchronous md.render() below.
+    await highlighter.loadLanguages(collectFenceLanguages(md, content));
     patch(container, md.render(content));
     // Diagrams are drawn after the patch, and their loading is not waited
     // for: the text should not be held back by a diagram library.
     void drawDiagrams(container);
   };
 
-  render(readInitialContent());
+  await render(readInitialContent());
   connect(render);
 }
 
-function connect(render: (content: string) => void): void {
+function connect(render: (content: string) => Promise<void>): void {
   const source = new EventSource(`/doc/${docId}/events`);
   let closed = false;
 
   source.addEventListener("open", () => showStatus(""));
 
   source.addEventListener("refresh", (ev) => {
-    const msg = JSON.parse((ev as MessageEvent<string>).data) as RefreshEvent;
-    render(msg.content);
-    // A refresh without a line comes from the file watcher. Moving the
-    // viewport then would fight with whoever is reading the page.
-    if (typeof msg.line === "number") {
-      scrollToLine(container, msg.line, msg.viewportRatio);
-    }
-    showStatus("");
+    void (async () => {
+      const msg = JSON.parse((ev as MessageEvent<string>).data) as RefreshEvent;
+      await render(msg.content);
+      // A refresh without a line comes from the file watcher. Moving the
+      // viewport then would fight with whoever is reading the page.
+      if (typeof msg.line === "number") {
+        scrollToLine(container, msg.line, msg.viewportRatio);
+      }
+      showStatus("");
+    })();
   });
 
   source.addEventListener("scroll", (ev) => {

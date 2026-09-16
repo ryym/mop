@@ -15,7 +15,7 @@ const SOURCE_LINE_RULES = [
   "table_open",
 ];
 
-// Names that map onto the languages shiki has loaded.
+// Names that map onto shiki's canonical language ids.
 const LANG_ALIASES: Record<string, string> = {
   js: "javascript",
   mjs: "javascript",
@@ -28,6 +28,26 @@ const LANG_ALIASES: Record<string, string> = {
   shell: "shellscript",
   console: "shellscript",
 };
+
+// Resolves a fence info string's first word to the shiki language id the
+// highlighter would be asked to render.
+function resolveLang(info: string): string {
+  const lang = info.trim().split(/\s+/)[0]?.toLowerCase() ?? "";
+  return LANG_ALIASES[lang] ?? lang;
+}
+
+// Languages fenced in `content`, deduplicated. Used to load only the shiki
+// grammars a document actually needs before rendering it; see main.ts.
+export function collectFenceLanguages(md: MarkdownIt, content: string): string[] {
+  const tokens = md.parse(content, {});
+  const langs = new Set<string>();
+  for (const token of tokens) {
+    if (token.type !== "fence") continue;
+    const lang = resolveLang(token.info);
+    if (lang && lang !== "mermaid") langs.add(lang);
+  }
+  return [...langs];
+}
 
 function escapeHtml(s: string): string {
   return s
@@ -49,15 +69,16 @@ export function createMarkdown(
     linkify: true,
     typographer: false,
     highlight(code, info) {
-      const lang = info.trim().split(/\s+/)[0]?.toLowerCase() ?? "";
+      const lang = resolveLang(info);
       // Diagram fences are handed to the browser as-is; see main.ts.
       if (lang === "mermaid") {
         return `<pre class="mermaid">${escapeHtml(code)}</pre>`;
       }
-      const resolved = LANG_ALIASES[lang] ?? lang;
-      // An unknown language is not an error: markdown-it falls back to its
-      // own escaped <pre><code> when this returns an empty string.
-      return highlighter.render(code, resolved) ?? "";
+      // An unknown or not-yet-loaded language is not an error: markdown-it
+      // falls back to its own escaped <pre><code> when this returns "".
+      // collectFenceLanguages + Highlighter.loadLanguages, called before
+      // render in main.ts, is what makes "not yet loaded" the rare case.
+      return highlighter.render(code, lang) ?? "";
     },
   });
 

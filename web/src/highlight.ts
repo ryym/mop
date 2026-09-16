@@ -1,161 +1,123 @@
 // Syntax highlighting with shiki.
 //
-// Two decisions the design docs left open are made here:
+// Decisions the design docs left open:
 //
 //   - The JavaScript RegExp engine is used instead of the oniguruma WASM
 //     build. It keeps the bundle a single JS file with no WASM blob to embed
 //     or fetch, which matters because everything ships inside the Go binary.
-//   - The language set covers common languages and formats, picked from
-//     @shikijs/langs' exports and skipping niche/DSL-specific grammars.
-//     Anything else falls back to a plain, unhighlighted code block.
+//   - Languages are loaded lazily, one dynamic import per grammar, instead of
+//     bundled up front. The supported set below is broad (picked from
+//     @shikijs/langs' exports, skipping niche/DSL-specific grammars), and
+//     loading all of it eagerly made the first render noticeably slower for
+//     documents that only ever use one or two languages.
 import { createHighlighterCore, type HighlighterCore } from "shiki/core";
 import { createJavaScriptRegexEngine } from "shiki/engine/javascript";
 import githubLight from "@shikijs/themes/github-light";
 import githubDark from "@shikijs/themes/github-dark";
-import langAstro from "@shikijs/langs/astro";
-import langC from "@shikijs/langs/c";
-import langClojure from "@shikijs/langs/clojure";
-import langCpp from "@shikijs/langs/cpp";
-import langCsharp from "@shikijs/langs/csharp";
-import langCss from "@shikijs/langs/css";
-import langCsv from "@shikijs/langs/csv";
-import langDart from "@shikijs/langs/dart";
-import langDiff from "@shikijs/langs/diff";
-import langDockerfile from "@shikijs/langs/dockerfile";
-import langElixir from "@shikijs/langs/elixir";
-import langErlang from "@shikijs/langs/erlang";
-import langGitCommit from "@shikijs/langs/git-commit";
-import langGitRebase from "@shikijs/langs/git-rebase";
-import langGlsl from "@shikijs/langs/glsl";
-import langGo from "@shikijs/langs/go";
-import langGraphql from "@shikijs/langs/graphql";
-import langGroovy from "@shikijs/langs/groovy";
-import langHaskell from "@shikijs/langs/haskell";
-import langHtml from "@shikijs/langs/html";
-import langIni from "@shikijs/langs/ini";
-import langJava from "@shikijs/langs/java";
-import langJavaScript from "@shikijs/langs/javascript";
-import langJson from "@shikijs/langs/json";
-import langJson5 from "@shikijs/langs/json5";
-import langJsonc from "@shikijs/langs/jsonc";
-import langJsx from "@shikijs/langs/jsx";
-import langKotlin from "@shikijs/langs/kotlin";
-import langLatex from "@shikijs/langs/latex";
-import langLess from "@shikijs/langs/less";
-import langLua from "@shikijs/langs/lua";
-import langMakefile from "@shikijs/langs/makefile";
-import langMarkdown from "@shikijs/langs/markdown";
-import langNginx from "@shikijs/langs/nginx";
-import langObjectiveC from "@shikijs/langs/objective-c";
-import langObjectiveCpp from "@shikijs/langs/objective-cpp";
-import langPerl from "@shikijs/langs/perl";
-import langPhp from "@shikijs/langs/php";
-import langProperties from "@shikijs/langs/properties";
-import langProtobuf from "@shikijs/langs/protobuf";
-import langPython from "@shikijs/langs/python";
-import langR from "@shikijs/langs/r";
-import langRegex from "@shikijs/langs/regex";
-import langRuby from "@shikijs/langs/ruby";
-import langRust from "@shikijs/langs/rust";
-import langScala from "@shikijs/langs/scala";
-import langScss from "@shikijs/langs/scss";
-import langShell from "@shikijs/langs/shellscript";
-import langSql from "@shikijs/langs/sql";
-import langSshConfig from "@shikijs/langs/ssh-config";
-import langSvelte from "@shikijs/langs/svelte";
-import langSwift from "@shikijs/langs/swift";
-import langTerraform from "@shikijs/langs/terraform";
-import langToml from "@shikijs/langs/toml";
-import langTsx from "@shikijs/langs/tsx";
-import langTypeScript from "@shikijs/langs/typescript";
-import langVim from "@shikijs/langs/vim";
-import langVue from "@shikijs/langs/vue";
-import langWasm from "@shikijs/langs/wasm";
-import langXml from "@shikijs/langs/xml";
-import langYaml from "@shikijs/langs/yaml";
+
+// Keyed by the canonical shiki language id (what markdown.ts resolves a fence
+// info string to). Each loader is a separate dynamic import so an unused
+// language never ends up in a browser's request at all.
+const LANG_LOADERS: Record<string, () => Promise<{ default: unknown }>> = {
+  astro: () => import("@shikijs/langs/astro"),
+  c: () => import("@shikijs/langs/c"),
+  clojure: () => import("@shikijs/langs/clojure"),
+  cpp: () => import("@shikijs/langs/cpp"),
+  csharp: () => import("@shikijs/langs/csharp"),
+  css: () => import("@shikijs/langs/css"),
+  csv: () => import("@shikijs/langs/csv"),
+  dart: () => import("@shikijs/langs/dart"),
+  diff: () => import("@shikijs/langs/diff"),
+  dockerfile: () => import("@shikijs/langs/dockerfile"),
+  elixir: () => import("@shikijs/langs/elixir"),
+  erlang: () => import("@shikijs/langs/erlang"),
+  "git-commit": () => import("@shikijs/langs/git-commit"),
+  "git-rebase": () => import("@shikijs/langs/git-rebase"),
+  glsl: () => import("@shikijs/langs/glsl"),
+  go: () => import("@shikijs/langs/go"),
+  graphql: () => import("@shikijs/langs/graphql"),
+  groovy: () => import("@shikijs/langs/groovy"),
+  haskell: () => import("@shikijs/langs/haskell"),
+  html: () => import("@shikijs/langs/html"),
+  ini: () => import("@shikijs/langs/ini"),
+  java: () => import("@shikijs/langs/java"),
+  javascript: () => import("@shikijs/langs/javascript"),
+  json: () => import("@shikijs/langs/json"),
+  json5: () => import("@shikijs/langs/json5"),
+  jsonc: () => import("@shikijs/langs/jsonc"),
+  jsx: () => import("@shikijs/langs/jsx"),
+  kotlin: () => import("@shikijs/langs/kotlin"),
+  latex: () => import("@shikijs/langs/latex"),
+  less: () => import("@shikijs/langs/less"),
+  lua: () => import("@shikijs/langs/lua"),
+  makefile: () => import("@shikijs/langs/makefile"),
+  markdown: () => import("@shikijs/langs/markdown"),
+  nginx: () => import("@shikijs/langs/nginx"),
+  "objective-c": () => import("@shikijs/langs/objective-c"),
+  "objective-cpp": () => import("@shikijs/langs/objective-cpp"),
+  perl: () => import("@shikijs/langs/perl"),
+  php: () => import("@shikijs/langs/php"),
+  properties: () => import("@shikijs/langs/properties"),
+  protobuf: () => import("@shikijs/langs/protobuf"),
+  python: () => import("@shikijs/langs/python"),
+  r: () => import("@shikijs/langs/r"),
+  regex: () => import("@shikijs/langs/regex"),
+  ruby: () => import("@shikijs/langs/ruby"),
+  rust: () => import("@shikijs/langs/rust"),
+  scala: () => import("@shikijs/langs/scala"),
+  scss: () => import("@shikijs/langs/scss"),
+  shellscript: () => import("@shikijs/langs/shellscript"),
+  sql: () => import("@shikijs/langs/sql"),
+  "ssh-config": () => import("@shikijs/langs/ssh-config"),
+  svelte: () => import("@shikijs/langs/svelte"),
+  swift: () => import("@shikijs/langs/swift"),
+  terraform: () => import("@shikijs/langs/terraform"),
+  toml: () => import("@shikijs/langs/toml"),
+  tsx: () => import("@shikijs/langs/tsx"),
+  typescript: () => import("@shikijs/langs/typescript"),
+  vim: () => import("@shikijs/langs/vim"),
+  vue: () => import("@shikijs/langs/vue"),
+  wasm: () => import("@shikijs/langs/wasm"),
+  xml: () => import("@shikijs/langs/xml"),
+  yaml: () => import("@shikijs/langs/yaml"),
+};
 
 export type Highlighter = {
+  /**
+   * Loads whatever languages in `langs` are supported and not loaded yet.
+   * Call this before `render` for a given language; an unloaded language
+   * makes `render` fall back to null rather than trigger a load itself, so
+   * that `render` can stay synchronous for the DOM-patching code in main.ts.
+   */
+  loadLanguages(langs: string[]): Promise<void>;
   /** Returns highlighted `<pre>` HTML, or null when the language is unknown. */
   render(code: string, lang: string): string | null;
 };
 
-// Languages are loaded up front so that highlighting is synchronous from then
-// on. An async highlight would make the page flicker as blocks get colored
-// one after another.
 export async function createHighlighter(): Promise<Highlighter> {
   const core: HighlighterCore = await createHighlighterCore({
     themes: [githubLight, githubDark],
-    langs: [
-      langAstro,
-      langC,
-      langClojure,
-      langCpp,
-      langCsharp,
-      langCss,
-      langCsv,
-      langDart,
-      langDiff,
-      langDockerfile,
-      langElixir,
-      langErlang,
-      langGitCommit,
-      langGitRebase,
-      langGlsl,
-      langGo,
-      langGraphql,
-      langGroovy,
-      langHaskell,
-      langHtml,
-      langIni,
-      langJava,
-      langJavaScript,
-      langJson,
-      langJson5,
-      langJsonc,
-      langJsx,
-      langKotlin,
-      langLatex,
-      langLess,
-      langLua,
-      langMakefile,
-      langMarkdown,
-      langNginx,
-      langObjectiveC,
-      langObjectiveCpp,
-      langPerl,
-      langPhp,
-      langProperties,
-      langProtobuf,
-      langPython,
-      langR,
-      langRegex,
-      langRuby,
-      langRust,
-      langScala,
-      langScss,
-      langShell,
-      langSql,
-      langSshConfig,
-      langSvelte,
-      langSwift,
-      langTerraform,
-      langToml,
-      langTsx,
-      langTypeScript,
-      langVim,
-      langVue,
-      langWasm,
-      langXml,
-      langYaml,
-    ],
+    langs: [],
     engine: createJavaScriptRegexEngine(),
   });
 
-  const known = new Set(core.getLoadedLanguages());
+  const loaded = new Set(core.getLoadedLanguages());
 
   return {
+    async loadLanguages(langs) {
+      const toLoad = [...new Set(langs)].filter(
+        (lang) => !loaded.has(lang) && lang in LANG_LOADERS,
+      );
+      await Promise.all(
+        toLoad.map(async (lang) => {
+          const mod = await LANG_LOADERS[lang]!();
+          await core.loadLanguage(mod.default as Parameters<typeof core.loadLanguage>[0]);
+          loaded.add(lang);
+        }),
+      );
+    },
     render(code, lang) {
-      if (!lang || !known.has(lang)) return null;
+      if (!lang || !loaded.has(lang)) return null;
       return core.codeToHtml(code, {
         lang,
         themes: { light: "github-light", dark: "github-dark" },

@@ -2,7 +2,9 @@ import { expect, test } from "bun:test";
 import { createHighlighter } from "./highlight";
 import { createMarkdown } from "./markdown";
 
-const md = createMarkdown(await createHighlighter(), "/doc/abc123/asset/");
+const highlighter = await createHighlighter();
+await highlighter.loadLanguages(["javascript"]);
+const md = createMarkdown(highlighter, "/doc/abc123/asset/");
 
 test("block elements carry 1 based source lines", () => {
   const html = md.render("# Title\n\ntext\n\n- item\n");
