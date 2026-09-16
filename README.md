@@ -51,31 +51,9 @@ mop daemon start [--port 7654] [--foreground]
 mop daemon stop
 ```
 
-## Vim / Neovim
+## Vim / Neovim plugin
 
-Source `editor/mop.vim`; no plugin manager is involved.
-
-```vim
-source /path/to/mop/editor/mop.vim
-let g:mop_command = '/path/to/mop/mop'   " when mop is not on PATH
-```
-
-| Command     | Effect                                                 |
-| ----------- | ------------------------------------------------------ |
-| `:Mop`      | Open a preview of the current buffer and start syncing |
-| `:MopClose` | Stop syncing and close the preview                     |
-
-After `:Mop`, buffer edits are sent with `mop update` (**including unsaved
-text**) and the window's view with `mop scroll`, so the preview follows where
-the window scrolls to. Closing the buffer or quitting Vim runs `mop close`
-automatically.
-
-| Variable               | Default | Meaning                                 |
-| ---------------------- | ------- | --------------------------------------- |
-| `g:mop_command`        | `mop`   | Command to run                          |
-| `g:mop_update_delay`   | 150     | Debounce before sending an edit (ms)    |
-| `g:mop_scroll_delay`   | 60      | Debounce before sending a scroll (ms)   |
-| `g:mop_viewport_ratio` | 0.0     | Where in the viewport to place the line |
+[ryym/mop.vim](https://github.com/ryym/mop.vim)
 
 ## Test
 
