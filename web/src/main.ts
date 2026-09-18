@@ -4,7 +4,7 @@
 // patching and scrolling all happen here.
 import { drawDiagrams } from "./diagram";
 import { createHighlighter } from "./highlight";
-import { collectFenceLanguages, createMarkdown } from "./markdown";
+import { collectLanguages, createMarkdown } from "./markdown";
 import { patch } from "./patch";
 import { scrollToLine } from "./scroll";
 
@@ -45,9 +45,10 @@ async function main(): Promise<void> {
   const md = createMarkdown(highlighter, `/doc/${docId}/asset/`);
 
   const render = async (content: string) => {
-    // Shiki grammars are loaded lazily, so whatever the fences in this
-    // content need has to be in before the synchronous md.render() below.
-    await highlighter.loadLanguages(collectFenceLanguages(md, content));
+    // Shiki grammars are loaded lazily, so whatever the fences and
+    // frontmatter in this content need has to be in before the synchronous
+    // md.render() below.
+    await highlighter.loadLanguages(collectLanguages(md, content));
     patch(container, md.render(content));
     // Diagrams are drawn after the patch, and their loading is not waited
     // for: the text should not be held back by a diagram library.

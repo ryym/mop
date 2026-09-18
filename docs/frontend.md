@@ -35,6 +35,10 @@ is not an error; it renders as a plain code block.
 Themes are emitted for both colour schemes at once and chosen with CSS, rather
 than one being baked in at render time.
 
+A YAML, TOML or JSON frontmatter block (`---`, `+++` or `;;;`, opening and
+closing the document's first lines) is rendered through this same path,
+highlighted as its language rather than parsed as Markdown.
+
 ## Source lines
 
 Block elements carry the source line they start at, in a `data-source-line`

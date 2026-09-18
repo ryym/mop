@@ -52,6 +52,16 @@ body {
   }
 }
 
+/* Frontmatter renders as a highlighted code block; only the spacing around
+   it is different, so it reads as metadata rather than as part of the body. */
+.mop-frontmatter {
+  margin-bottom: 1.5rem;
+}
+
+.mop-frontmatter pre {
+  margin: 0;
+}
+
 /*
  * A drawn diagram is an <svg> inside the <pre> that held its source, so the
  * code block styling has to be undone once it is drawn.

@@ -45,3 +45,43 @@ test("mermaid fences are left for the browser to draw", () => {
     '<pre class="mermaid">graph TD; A--&gt;B;',
   );
 });
+
+test("YAML, TOML and JSON frontmatter at the top of the document is highlighted", async () => {
+  const highlighter2 = await createHighlighter();
+  await highlighter2.loadLanguages(["yaml", "toml", "json"]);
+  const md2 = createMarkdown(highlighter2, "/doc/abc123/asset/");
+
+  const yaml = md2.render("---\ntitle: Hello\n---\n\n# Body\n");
+  expect(yaml).toContain('<div class="mop-frontmatter" data-source-line="1">');
+  expect(yaml).toContain("shiki");
+  expect(yaml).toContain("<h1");
+
+  const toml = md2.render('+++\ntitle = "Hello"\n+++\n\n# Body\n');
+  expect(toml).toContain('<div class="mop-frontmatter" data-source-line="1">');
+  expect(toml).toContain("shiki");
+
+  const json = md2.render(';;;\n{ "title": "Hello" }\n;;;\n\n# Body\n');
+  expect(json).toContain('<div class="mop-frontmatter" data-source-line="1">');
+  expect(json).toContain("shiki");
+});
+
+test("a document without frontmatter is unaffected", () => {
+  const html = md.render("# Title\n\ntext\n");
+  expect(html).not.toContain("mop-frontmatter");
+});
+
+test("a --- block that is not at the very top, or has no closing line, is left as plain Markdown", () => {
+  // The classic "thematic break in the middle of a document" case.
+  const middle = md.render("# Title\n\n---\n\ntext\n");
+  expect(middle).not.toContain("mop-frontmatter");
+  expect(middle).toContain("<hr>");
+
+  // Opens like frontmatter but is never closed.
+  const unclosed = md.render("---\ntitle: Hello\n\n# Body\n");
+  expect(unclosed).not.toContain("mop-frontmatter");
+});
+
+test("source lines after a frontmatter block still match the source", () => {
+  const html = md.render("---\ntitle: Hello\n---\n\n# Body\n");
+  expect(html).toContain('<h1 data-source-line="5">');
+});
