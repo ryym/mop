@@ -59,7 +59,8 @@ function frontmatterRule(
 }
 
 // Makes `md` parse a frontmatter block and render it highlighted, through the
-// same highlighter fences use.
+// same highlighter fences use. It renders as a <details>, open by default:
+// metadata is worth seeing but not worth pushing the body down permanently.
 export function addFrontmatter(md: MarkdownIt, highlighter: Highlighter): void {
   // Register before "hr" so the rule gets first look at a document-opening
   // "---" line, which "hr" would otherwise claim.
@@ -74,6 +75,6 @@ export function addFrontmatter(md: MarkdownIt, highlighter: Highlighter): void {
     const html =
       highlighter.render(token.content, token.info) ??
       `<pre>${escapeHtml(token.content)}</pre>`;
-    return `<div class="mop-frontmatter" data-source-line="${line}">${html}</div>\n`;
+    return `<details class="mop-frontmatter" open data-source-line="${line}"><summary>Metadata</summary>${html}</details>\n`;
   };
 }

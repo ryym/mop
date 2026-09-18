@@ -52,16 +52,17 @@ test("YAML, TOML and JSON frontmatter at the top of the document is highlighted"
   const md2 = createMarkdown(highlighter2, "/doc/abc123/asset/");
 
   const yaml = md2.render("---\ntitle: Hello\n---\n\n# Body\n");
-  expect(yaml).toContain('<div class="mop-frontmatter" data-source-line="1">');
+  expect(yaml).toContain('<details class="mop-frontmatter" open data-source-line="1">');
+  expect(yaml).toContain("<summary>Metadata</summary>");
   expect(yaml).toContain("shiki");
   expect(yaml).toContain("<h1");
 
   const toml = md2.render('+++\ntitle = "Hello"\n+++\n\n# Body\n');
-  expect(toml).toContain('<div class="mop-frontmatter" data-source-line="1">');
+  expect(toml).toContain('<details class="mop-frontmatter" open data-source-line="1">');
   expect(toml).toContain("shiki");
 
   const json = md2.render(';;;\n{ "title": "Hello" }\n;;;\n\n# Body\n');
-  expect(json).toContain('<div class="mop-frontmatter" data-source-line="1">');
+  expect(json).toContain('<details class="mop-frontmatter" open data-source-line="1">');
   expect(json).toContain("shiki");
 });
 

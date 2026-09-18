@@ -52,10 +52,16 @@ body {
   }
 }
 
-/* Frontmatter renders as a highlighted code block; only the spacing around
-   it is different, so it reads as metadata rather than as part of the body. */
+/* Frontmatter renders as a collapsible, highlighted code block. */
 .mop-frontmatter {
   margin-bottom: 1.5rem;
+}
+
+.mop-frontmatter > summary {
+  cursor: pointer;
+  color: var(--fgColor-muted);
+  font-size: 0.85rem;
+  margin-bottom: 0.5rem;
 }
 
 .mop-frontmatter pre {
