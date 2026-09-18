@@ -10,12 +10,7 @@ import { escapeHtml } from "./html";
 // limits this to headings, paragraphs, list items and tables: they are enough
 // to interpolate any line in between, and tagging everything would bloat the
 // diff morphdom has to reconcile.
-const SOURCE_LINE_RULES = [
-  "heading_open",
-  "paragraph_open",
-  "list_item_open",
-  "table_open",
-];
+const SOURCE_LINE_RULES = ["heading_open", "paragraph_open", "list_item_open", "table_open"];
 
 // Names that map onto shiki's canonical language ids.
 const LANG_ALIASES: Record<string, string> = {
@@ -56,10 +51,7 @@ export function collectLanguages(md: MarkdownIt, content: string): string[] {
   return [...langs];
 }
 
-export function createMarkdown(
-  highlighter: Highlighter,
-  assetBase: string,
-): MarkdownIt {
+export function createMarkdown(highlighter: Highlighter, assetBase: string): MarkdownIt {
   const md = new MarkdownIt({
     // Required. Raw HTML in the source is never turned into HTML, and that is
     // what makes a separate sanitizer unnecessary. Changing this flag is a
@@ -100,8 +92,7 @@ export function createMarkdown(
 function addAssetPaths(md: MarkdownIt, assetBase: string): void {
   const original =
     md.renderer.rules.image ??
-    ((tokens, idx, options, _env, self) =>
-      self.renderToken(tokens, idx, options));
+    ((tokens, idx, options, _env, self) => self.renderToken(tokens, idx, options));
 
   md.renderer.rules.image = (tokens, idx, options, env, self) => {
     const token = tokens[idx]!;
@@ -127,8 +118,7 @@ function addSourceLines(md: MarkdownIt): void {
   for (const rule of SOURCE_LINE_RULES) {
     const original =
       md.renderer.rules[rule] ??
-      ((tokens, idx, options, _env, self) =>
-        self.renderToken(tokens, idx, options));
+      ((tokens, idx, options, _env, self) => self.renderToken(tokens, idx, options));
     md.renderer.rules[rule] = (tokens, idx, options, env, self) => {
       const token = tokens[idx]!;
       if (token.map) {

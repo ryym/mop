@@ -14,9 +14,7 @@ function loadMermaid(): Promise<typeof import("mermaid").default> {
         startOnLoad: false,
         // Theme is chosen once, at load. Following a theme switch would mean
         // re-drawing every diagram, which is not worth it here.
-        theme: window.matchMedia?.("(prefers-color-scheme: dark)").matches
-          ? "dark"
-          : "default",
+        theme: window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "default",
       });
       return mermaid;
     });
@@ -32,9 +30,9 @@ let seq = 0;
  * the diagram would be rolled back to its source text on every refresh.
  */
 export async function drawDiagrams(container: HTMLElement): Promise<void> {
-  const targets = Array.from(
-    container.querySelectorAll<HTMLElement>("pre.mermaid"),
-  ).filter((el) => el.dataset.mopRendered !== "1");
+  const targets = Array.from(container.querySelectorAll<HTMLElement>("pre.mermaid")).filter(
+    (el) => el.dataset.mopRendered !== "1",
+  );
   if (targets.length === 0) return;
 
   const mermaid = await loadMermaid();

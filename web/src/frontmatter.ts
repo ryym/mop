@@ -73,8 +73,7 @@ export function addFrontmatter(md: MarkdownIt, highlighter: Highlighter): void {
     // custom output does not.
     const line = token.map ? token.map[0]! + 1 : 1;
     const html =
-      highlighter.render(token.content, token.info) ??
-      `<pre>${escapeHtml(token.content)}</pre>`;
+      highlighter.render(token.content, token.info) ?? `<pre>${escapeHtml(token.content)}</pre>`;
     return `<details class="mop-frontmatter" open data-source-line="${line}"><summary>Metadata</summary>${html}</details>\n`;
   };
 }

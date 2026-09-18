@@ -11,8 +11,7 @@ type Anchor = { line: number; top: number };
 // tells the reader where the view went. The only exception is the reader
 // having asked the OS for less motion.
 function scrollBehavior(): ScrollBehavior {
-  const reduced =
-    window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+  const reduced = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
   return reduced ? "auto" : "smooth";
 }
 
@@ -30,11 +29,7 @@ function anchors(container: HTMLElement): Anchor[] {
   return found;
 }
 
-export function scrollToLine(
-  container: HTMLElement,
-  line: number,
-  ratio?: number | null,
-): void {
+export function scrollToLine(container: HTMLElement, line: number, ratio?: number | null): void {
   const r = typeof ratio === "number" ? ratio : DEFAULT_VIEWPORT_RATIO;
   const list = anchors(container);
   if (list.length === 0) return;
