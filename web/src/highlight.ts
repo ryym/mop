@@ -1,23 +1,20 @@
 // Syntax highlighting with shiki.
 //
-// Decisions the design docs left open:
-//
-//   - The JavaScript RegExp engine is used instead of the oniguruma WASM
-//     build. It keeps the bundle a single JS file with no WASM blob to embed
-//     or fetch, which matters because everything ships inside the Go binary.
-//   - Languages are loaded lazily, one dynamic import per grammar, instead of
-//     bundled up front. The supported set below is broad (picked from
-//     @shikijs/langs' exports, skipping niche/DSL-specific grammars), and
-//     loading all of it eagerly made the first render noticeably slower for
-//     documents that only ever use one or two languages.
+// The JavaScript RegExp engine is used instead of the oniguruma WASM build: it
+// keeps the bundle a single JS file with no WASM blob to embed or fetch, which
+// matters because everything ships inside the Go binary.
 import { createHighlighterCore, type HighlighterCore } from "shiki/core";
 import { createJavaScriptRegexEngine } from "shiki/engine/javascript";
 import githubLight from "@shikijs/themes/github-light";
 import githubDark from "@shikijs/themes/github-dark";
 
-// Keyed by the canonical shiki language id (what markdown.ts resolves a fence
-// info string to). Each loader is a separate dynamic import so an unused
-// language never ends up in a browser's request at all.
+// Supported languages, keyed by the canonical shiki language id (what
+// markdown.ts resolves a fence info string to). The set is picked from
+// @shikijs/langs' exports, skipping niche/DSL-specific grammars.
+//
+// Each loader is a separate dynamic import: bundling every grammar up front
+// made the first render noticeably slower for documents that only ever use one
+// or two languages.
 const LANG_LOADERS: Record<string, () => Promise<{ default: unknown }>> = {
   astro: () => import("@shikijs/langs/astro"),
   c: () => import("@shikijs/langs/c"),

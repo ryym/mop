@@ -9,8 +9,7 @@ import morphdom from "morphdom";
 export function patch(container: HTMLElement, html: string): void {
   // morphdom compares two elements, so the new HTML gets its own container of
   // the same shape. Assigning innerHTML here is safe because the string comes
-  // from markdown-it with html: false, i.e. no HTML from the source document
-  // survives as markup (see markdown.ts).
+  // from markdown-it with html: false (see markdown.ts).
   const next = document.createElement(container.tagName);
   next.id = container.id;
   next.innerHTML = html;

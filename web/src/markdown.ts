@@ -33,9 +33,8 @@ function resolveLang(info: string): string {
   return LANG_ALIASES[lang] ?? lang;
 }
 
-// Languages used by the fences and the frontmatter in `content`,
-// deduplicated. Used to load only the shiki grammars a document actually
-// needs before rendering it; see main.ts.
+// Languages used by the fences and the frontmatter in `content`, deduplicated,
+// so that only the grammars a document actually needs get loaded.
 export function collectLanguages(md: MarkdownIt, content: string): string[] {
   const tokens = md.parse(content, {});
   const langs = new Set<string>();
@@ -53,9 +52,9 @@ export function collectLanguages(md: MarkdownIt, content: string): string[] {
 
 export function createMarkdown(highlighter: Highlighter, assetBase: string): MarkdownIt {
   const md = new MarkdownIt({
-    // Required. Raw HTML in the source is never turned into HTML, and that is
-    // what makes a separate sanitizer unnecessary. Changing this flag is a
-    // change of the sanitizing policy itself, not a rendering tweak.
+    // Raw HTML in the source is never turned into HTML, and that is what makes
+    // a separate sanitizer unnecessary. Changing this flag is a change of the
+    // sanitizing policy itself, not a rendering tweak.
     html: false,
     linkify: true,
     typographer: false,
@@ -67,8 +66,6 @@ export function createMarkdown(highlighter: Highlighter, assetBase: string): Mar
       }
       // An unknown or not-yet-loaded language is not an error: markdown-it
       // falls back to its own escaped <pre><code> when this returns "".
-      // collectLanguages + Highlighter.loadLanguages, called before render
-      // in main.ts, is what makes "not yet loaded" the rare case.
       return highlighter.render(code, lang) ?? "";
     },
   });
@@ -81,10 +78,8 @@ export function createMarkdown(highlighter: Highlighter, assetBase: string): Mar
 }
 
 // addAssetPaths points relative image sources at the daemon's asset endpoint.
-//
-// The page lives at /doc/<id>, so a bare "img.png" would resolve to
-// /doc/img.png, which is not a route. The file actually sits next to the
-// document, and the daemon serves that directory under /doc/<id>/asset/.
+// The page lives at /doc/<id>, so a bare "img.png" would resolve to the
+// non-existent /doc/img.png instead of the file sitting next to the document.
 //
 // Paths that climb out of the document's directory are left alone: the daemon
 // serves the base directory only, so rewriting them would just produce a

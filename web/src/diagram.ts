@@ -24,11 +24,7 @@ function loadMermaid(): Promise<typeof import("mermaid").default> {
 
 let seq = 0;
 
-/**
- * Draws every diagram that is not drawn yet. Elements are marked so that the
- * next DOM patch leaves the drawn <svg> alone (see patch.ts): without that,
- * the diagram would be rolled back to its source text on every refresh.
- */
+/** Draws every diagram in `container` that is not drawn yet. */
 export async function drawDiagrams(container: HTMLElement): Promise<void> {
   const targets = Array.from(container.querySelectorAll<HTMLElement>("pre.mermaid")).filter(
     (el) => el.dataset.mopRendered !== "1",
@@ -51,6 +47,9 @@ export async function drawDiagrams(container: HTMLElement): Promise<void> {
       el.classList.add("mop-diagram-error");
       el.title = String(err);
     }
+    // Record the source the element was drawn from, so the next DOM patch
+    // leaves the <svg> alone instead of rolling it back to the source text
+    // (see patch.ts).
     el.dataset.mopSource = source;
     el.dataset.mopRendered = "1";
   }

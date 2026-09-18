@@ -17,12 +17,10 @@ const FRONTMATTER_MARKERS: Record<string, string> = {
 };
 
 // markdown-it block rule recognizing a frontmatter block: a marker on the
-// document's first line, closed by a matching line. It becomes a single
-// token carrying its language in token.info, the way a fence token carries
-// its info string.
-//
-// Anything else — a marker elsewhere in the document, or one never closed —
-// falls through to ordinary block parsing, as if this rule did not exist.
+// document's first line, closed by a matching line. It becomes a single token
+// carrying its language in token.info, the way a fence token carries its info
+// string. Anything else — a marker elsewhere, or one never closed — falls
+// through to ordinary block parsing.
 function frontmatterRule(
   state: StateBlock,
   startLine: number,

@@ -34,11 +34,9 @@ body {
  * shiki emits both themes at once as CSS variables (defaultColor: false),
  * so the theme follows prefers-color-scheme without re-highlighting.
  *
- * Only the token colors are taken from the theme. Its background is ignored
- * on purpose: github-light's is plain white, which would make a highlighted
- * block indistinguishable from the page while an unhighlighted one kept the
- * background github-markdown-css puts on `pre`. Every code block now shares
- * that one background.
+ * Only the token colors are taken from the theme; its background is ignored so
+ * that highlighted and unhighlighted blocks alike keep the one background
+ * github-markdown-css puts on `pre`.
  */
 .shiki,
 .shiki span {
@@ -88,7 +86,7 @@ pre.mermaid.mop-diagram-error {
   border-left: 3px solid #d1242f;
 }
 
-/* Minimal indicator: reconnecting / closed. No toolbar, no settings. */
+/* Connection indicator: reconnecting / closed. */
 #mop-status {
   position: fixed;
   right: 0.75rem;
