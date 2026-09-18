@@ -1,3 +1,8 @@
+---
+title: Sample document
+tags: [markdown, preview]
+---
+
 # Heading level 1
 
 A paragraph of body text, here to show the base font, its size and its line
