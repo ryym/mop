@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 // docID is the identifier used in preview URLs. Deriving it from the absolute
@@ -37,4 +38,28 @@ func (d *document) readFromDisk() (string, error) {
 		return "", fmt.Errorf("failed to read %s: %w", d.path, err)
 	}
 	return string(data), nil
+}
+
+// displayPath is the document's path as shown to the reader: the absolute
+// path, with the home directory abbreviated to ~ so that long paths stay
+// readable.
+func (d *document) displayPath() string {
+	home, err := os.UserHomeDir()
+	if err != nil || home == "" {
+		return d.path
+	}
+	if d.path == home {
+		return "~"
+	}
+	if rest, ok := strings.CutPrefix(d.path, home+string(filepath.Separator)); ok {
+		return "~" + string(filepath.Separator) + rest
+	}
+	return d.path
+}
+
+// title names the document in the browser tab, where the full path does not
+// fit. The parent directory is kept because file names alone (README.md,
+// index.md) rarely tell two tabs apart.
+func (d *document) title() string {
+	return filepath.Join(filepath.Base(d.baseDir), filepath.Base(d.path))
 }

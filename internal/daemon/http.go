@@ -220,7 +220,8 @@ func (s *Server) handlePage(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
 	err = s.page.Execute(w, map[string]any{
-		"Title":   filepath.Base(d.path),
+		"Title":   d.title(),
+		"Path":    d.displayPath(),
 		"ID":      d.id,
 		"Initial": initial,
 	})
