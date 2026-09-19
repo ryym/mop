@@ -1,10 +1,12 @@
 # mop
 
-Live Markdown preview in the browser, driven from the command line.
+Live Markdown preview in the browser using [github-markdown-css], driven from the command line.
 
 `mop open README.md` opens a preview that follows the file as you edit it. An
 editor can push unsaved buffer contents and the current scroll position, so the
 preview stays in step with what you are looking at.
+
+[github-markdown-css]: https://github.com/sindresorhus/github-markdown-css
 
 ## Build
 
