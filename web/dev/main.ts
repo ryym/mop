@@ -6,7 +6,7 @@
 // instead of patched, and no scrolling is synchronised.
 import { drawDiagrams } from "../src/diagram";
 import { createHighlighter } from "../src/highlight";
-import { createMarkdown } from "../src/markdown";
+import { collectLanguages, createMarkdown } from "../src/markdown";
 import sample from "./sample.md" with { type: "text" };
 
 const container = document.getElementById("mop-content") as HTMLElement;
@@ -15,6 +15,10 @@ const highlighter = await createHighlighter();
 // The asset base is unused: sample.md keeps its images self contained, since
 // there is no daemon here to serve files next to the document.
 const md = createMarkdown(highlighter, "");
+
+// Shiki grammars are loaded lazily, so the ones sample.md needs have to be in
+// before the synchronous md.render() below.
+await highlighter.loadLanguages(collectLanguages(md, sample));
 
 container.innerHTML = md.render(sample);
 void drawDiagrams(container);
