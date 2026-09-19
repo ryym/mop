@@ -23,8 +23,7 @@ import (
 
 const (
 	// idleTimeout is how long the daemon stays alive with no browser
-	// connected. Tabs being closed is what ends a session, so `mop close`
-	// can be forgotten without leaving a process behind.
+	// connected: closing the last tab is what ends a session.
 	idleTimeout = 10 * time.Minute
 	idleCheck   = 30 * time.Second
 )
@@ -234,8 +233,8 @@ func (s *Server) closeDoc(path string) bool {
 }
 
 // setContent stores the new text and reports whether it differs from what the
-// document already had. Identical text produces no refresh at all: that is the
-// only de-duplication in the system, since neither side computes diffs.
+// document already had, so that identical text can be dropped without a
+// refresh.
 func (s *Server) setContent(d *document, content string) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -252,8 +251,8 @@ func (s *Server) snapshot(d *document) string {
 	return d.content
 }
 
-// onFileChanged is called by the watcher. Disk content and `mop update` are
-// not ranked against each other: whichever arrives last wins.
+// onFileChanged is the watcher callback: it re-reads the file and pushes it to
+// the browsers watching it.
 func (s *Server) onFileChanged(path string) {
 	d, ok := s.getDoc(path)
 	if !ok {
@@ -271,9 +270,7 @@ func (s *Server) onFileChanged(path string) {
 	s.hub.broadcast(d.id, newEvent("refresh", refreshPayload{Content: content}))
 }
 
-// refreshPayload carries the raw Markdown, not HTML. Parsing and highlighting
-// happen in the browser, so the daemon needs no Markdown code at all and new
-// syntax never requires a change here.
+// refreshPayload carries raw Markdown, not HTML: rendering is the browser's job.
 type refreshPayload struct {
 	Content       string   `json:"content"`
 	Line          *int     `json:"line,omitempty"`

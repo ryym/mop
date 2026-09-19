@@ -8,12 +8,9 @@ import (
 	"path/filepath"
 )
 
-// docID is the identifier used in preview URLs: the first 12 hex characters
-// of the SHA-256 of the absolute path.
-//
-// Deriving it from the path means the same file always gets the same URL, so
-// browser tabs survive a daemon restart, and no counter has to be persisted.
-// The absolute path also stays out of the URL.
+// docID is the identifier used in preview URLs. Deriving it from the absolute
+// path means the same file always gets the same URL, without persisting a
+// counter and without putting the path itself in the URL.
 func docID(path string) string {
 	sum := sha256.Sum256([]byte(path))
 	return hex.EncodeToString(sum[:])[:12]
@@ -22,7 +19,7 @@ func docID(path string) string {
 type document struct {
 	id      string
 	path    string
-	baseDir string // the file's parent directory; used for relative assets
+	baseDir string // resolves the document's relative assets
 	content string // the raw Markdown, as received or read from disk
 }
 

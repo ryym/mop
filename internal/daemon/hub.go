@@ -6,20 +6,15 @@ import (
 	"time"
 )
 
-// event is one SSE message. There are three, all sent on a document's stream:
+// event is one SSE message on a document's stream. Three names are sent:
 //
-//   - refresh: the whole document as raw Markdown, plus an optional line and
-//     viewport ratio. The browser re-renders, and scrolls only if a line came
-//     with it.
-//   - scroll: a line and an optional viewport ratio, with no content. The
-//     browser only scrolls.
-//   - close: the document is no longer open. The browser says so and stops
-//     reconnecting.
-//
-// data is already JSON encoded on a single line: a bare newline inside `data:`
-// would be interpreted by the SSE framing.
+//   - refresh: the whole document, optionally with a position to scroll to.
+//   - scroll: a position only.
+//   - close: the document is no longer open.
 type event struct {
 	name string
+	// data is JSON on a single line, because a bare newline inside `data:`
+	// would be taken as SSE framing.
 	data string
 }
 

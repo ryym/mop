@@ -1,11 +1,8 @@
-// Package api holds the request and response types of the control API.
-//
-// It exists so that the daemon (server) and the client agree on one
-// definition; the alternative was duplicating the structs in both packages.
+// Package api holds the request and response types of the control API, so that
+// the daemon and the client share one definition of them.
 package api
 
-// DefaultPort is the fixed port the daemon listens on unless told otherwise.
-// It never falls back to another port, so URLs stay stable across restarts.
+// DefaultPort is the port the daemon listens on unless told otherwise.
 const DefaultPort = 7654
 
 type OpenRequest struct {
@@ -43,9 +40,8 @@ type DocsResponse struct {
 }
 
 type StatusResponse struct {
-	Version string `json:"version"`
-	Port    int    `json:"port"`
-	// UptimeSeconds is how long the daemon has been running.
+	Version       string  `json:"version"`
+	Port          int     `json:"port"`
 	UptimeSeconds float64 `json:"uptimeSeconds"`
 }
 

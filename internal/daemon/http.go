@@ -339,15 +339,14 @@ func (s *Server) handleStatic(w http.ResponseWriter, r *http.Request) {
 
 // initialJSON encodes the raw Markdown for the <script type="application/json">
 // block in the page.
-//
-// encoding/json escapes <, > and & as \u003c and friends by default, so the
-// document can never terminate the surrounding <script> element. The result is
-// marked as template.JS because it is already JSON, and html/template would
-// otherwise escape it a second time.
 func initialJSON(content string) (template.JS, error) {
+	// encoding/json escapes <, > and & as \u003c and friends by default, so the
+	// document can never terminate the surrounding <script> element.
 	data, err := json.Marshal(map[string]string{"content": content})
 	if err != nil {
 		return "", err
 	}
+	// Mark it as template.JS because it is already JSON; html/template would
+	// otherwise escape it a second time.
 	return template.JS(data), nil
 }

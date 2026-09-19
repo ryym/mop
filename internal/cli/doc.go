@@ -20,11 +20,10 @@ func newFlagSet(name string) *flag.FlagSet {
 
 var errNoDaemon = errors.New("no preview is running")
 
-// connectExisting talks to a daemon that is already running, and refuses to
-// start one. Only `open` (and `daemon start`) may bring a daemon up: update,
-// scroll and close all need a document that is already registered, so
-// starting a fresh daemon could not make them succeed. It would only add a
-// multi second stall to what an editor integration calls on every keystroke.
+// connectExisting talks to a daemon that is already running, returning
+// errNoDaemon instead of starting one. Commands that act on a registered
+// document cannot be made to succeed by a fresh daemon, so starting one would
+// only add a multi second stall to what an editor calls on every keystroke.
 func connectExisting() (*client.Client, error) {
 	if _, err := state.Load(); errors.Is(err, state.ErrNoState) {
 		return nil, errNoDaemon
@@ -33,7 +32,8 @@ func connectExisting() (*client.Client, error) {
 }
 
 // positionFlags are the --line / --viewport-ratio pair shared by update and
-// scroll. Both are pointers so "not given" stays distinguishable.
+// scroll. linePtr and ratioPtr report an omitted flag as nil, which is how the
+// control API distinguishes it from a given value.
 type positionFlags struct {
 	line  int
 	ratio float64

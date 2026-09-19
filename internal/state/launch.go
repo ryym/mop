@@ -17,14 +17,8 @@ import (
 // startupTimeout is how long we wait for a freshly spawned daemon to answer.
 const startupTimeout = 5 * time.Second
 
-// Connect returns a client for a running daemon, starting one if necessary.
-//
-// The sequence follows the daemon spec:
-//  1. no state file -> start a daemon
-//  2. state file but nothing answering -> discard it and start a daemon
-//  3. version or build mismatch -> stop the old daemon and start a new one,
-//     because a stale binary would otherwise fail in confusing, protocol
-//     shaped ways, or serve the assets it was built with
+// Connect returns a client for a running daemon, starting one if none is
+// running or the one that is turns out to be unusable.
 func Connect() (*client.Client, error) {
 	s, err := Load()
 	if errors.Is(err, ErrNoState) {
@@ -40,6 +34,8 @@ func Connect() (*client.Client, error) {
 		_ = Clear()
 		return startAndWait(api.DefaultPort)
 	}
+	// Replace a daemon running from another binary: it would otherwise serve
+	// the assets it was built with, or fail in confusing, protocol shaped ways.
 	if status.Version != version.Version || s.Build != BuildID() {
 		_ = c.Shutdown()
 		waitGone(c)
@@ -51,11 +47,8 @@ func Connect() (*client.Client, error) {
 }
 
 // Spawn starts the daemon as a detached background process running this same
-// binary. The daemon outlives the CLI process that spawned it, so it is put
-// in its own process group and its output goes to the log file.
-//
-// The child is started with --foreground: it *is* the daemon, and detaching
-// is this function's job. Otherwise the child would fork again.
+// binary, logging to the daemon log file. It returns once the process has been
+// started, which is before the daemon is reachable.
 func Spawn(port int) error {
 	exe, err := os.Executable()
 	if err != nil {
@@ -67,10 +60,13 @@ func Spawn(port int) error {
 	}
 	defer logFile.Close()
 
+	// Pass --foreground so the child *is* the daemon rather than forking again:
+	// detaching it is this function's job.
 	cmd := exec.Command(exe, "daemon", "start", "--foreground", "--port", fmt.Sprint(port))
 	cmd.Stdin = nil
 	cmd.Stdout = logFile
 	cmd.Stderr = logFile
+	// Give it its own process group so it outlives the CLI process.
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
 	if err := cmd.Start(); err != nil {
 		return err
@@ -80,7 +76,6 @@ func Spawn(port int) error {
 	return nil
 }
 
-// openLog opens the daemon log file for appending, creating its directory.
 func openLog() (*os.File, error) {
 	path, err := LogPath()
 	if err != nil {
