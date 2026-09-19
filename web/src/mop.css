@@ -10,13 +10,18 @@ body {
   margin: 0;
 }
 
+/* Kept in view while scrolling: the path is the only thing on the page that
+   says which document this is. */
 #mop-title {
-  max-width: 980px;
-  margin: 0 auto;
-  padding: 0.5rem 1.5rem 0;
-  font-size: 0.9rem;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 0.3rem max(1.5rem, calc((100% - 980px) / 2));
+  font-size: 0.8rem;
   color: var(--fgColor-muted);
   word-break: break-all;
+  background-color: var(--bgColor-default);
+  border-bottom: 1px solid var(--borderColor-muted);
 }
 
 /* The trailing padding keeps the last lines reachable by scroll sync. */
