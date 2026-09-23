@@ -64,9 +64,10 @@ fresh process, and what keeps a preview URL valid across daemon restarts.
 
 ### Links between files
 
-`/doc/<id>/file?path=<relative path>` resolves a path relative to the
-document. The path goes in the query because browsers collapse `..` in a URL
-path, even percent-encoded. The daemon looks only at the target's extension:
+The browser rewrites every relative URL in a document, links and images alike,
+to `/doc/<id>/file?path=<relative path>`. The path goes in the query because
+browsers collapse `..` in a URL path, even percent-encoded. The daemon looks
+only at the target's extension:
 
 - **A Markdown document** is opened as if by `mop open`, and the browser is
   redirected to its preview.

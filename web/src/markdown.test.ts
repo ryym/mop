@@ -4,7 +4,7 @@ import { createMarkdown } from "./markdown";
 
 const highlighter = await createHighlighter();
 await highlighter.loadLanguages(["javascript"]);
-const md = createMarkdown(highlighter, "/doc/abc123/asset/");
+const md = createMarkdown(highlighter, "/doc/abc123/file");
 
 test("block elements carry 1 based source lines", () => {
   const html = md.render("# Title\n\ntext\n\n- item\n");
@@ -24,20 +24,40 @@ test("a loaded language is highlighted, an unknown one is not", () => {
   expect(md.render("```nosuchlang\nx\n```\n")).not.toContain("shiki");
 });
 
-test("relative images point at the document's asset endpoint", () => {
-  const html = md.render("![a](img.png)\n\n![b](./sub/x.png)\n");
-  expect(html).toContain('src="/doc/abc123/asset/img.png"');
-  expect(html).toContain('src="/doc/abc123/asset/sub/x.png"');
+test("relative images and links point at the document's file endpoint", () => {
+  const html = md.render("![a](img.png) ![b](./sub/x.png) [c](../README.md)\n");
+  expect(html).toContain('src="/doc/abc123/file?path=img.png"');
+  expect(html).toContain('src="/doc/abc123/file?path=.%2Fsub%2Fx.png"');
+  expect(html).toContain('href="/doc/abc123/file?path=..%2FREADME.md"');
 });
 
-test("absolute and escaping image sources are left alone", () => {
+test("reference style links are rewritten too", () => {
+  const html = md.render("[a][ref]\n\n[ref]: other.md\n");
+  expect(html).toContain('href="/doc/abc123/file?path=other.md"');
+});
+
+test("the fragment stays outside the query and the query is dropped", () => {
+  const html = md.render("[a](other.md#sec) ![b](img.png?v=1)\n");
+  expect(html).toContain('href="/doc/abc123/file?path=other.md#sec"');
+  expect(html).toContain('src="/doc/abc123/file?path=img.png"');
+});
+
+test("paths are encoded once, and encoded # stays in the path", () => {
+  const html = md.render("![a](画像.png) [b](<my file.md>) [c](a%23b.md)\n");
+  expect(html).toContain('src="/doc/abc123/file?path=%E7%94%BB%E5%83%8F.png"');
+  expect(html).toContain('href="/doc/abc123/file?path=my%20file.md"');
+  expect(html).toContain('href="/doc/abc123/file?path=a%23b.md"');
+});
+
+test("absolute URLs, root paths, fragments and data URLs are left alone", () => {
   const html = md.render(
-    "![a](https://example.com/x.png)\n\n![b](/x.png)\n\n![c](../x.png)\n\n![d](data:image/png;base64,AA)\n",
+    "![a](https://example.com/x.png) ![b](/x.png) [c](#sec) ![d](data:image/png;base64,AA) [e](//example.com/)\n",
   );
   expect(html).toContain('src="https://example.com/x.png"');
   expect(html).toContain('src="/x.png"');
-  expect(html).toContain('src="../x.png"');
+  expect(html).toContain('href="#sec"');
   expect(html).toContain('src="data:image/png;base64,AA"');
+  expect(html).toContain('href="//example.com/"');
 });
 
 test("only text with a scheme is linkified", () => {
@@ -56,7 +76,7 @@ test("mermaid fences are left for the browser to draw", () => {
 test("YAML, TOML and JSON frontmatter at the top of the document is highlighted", async () => {
   const highlighter2 = await createHighlighter();
   await highlighter2.loadLanguages(["yaml", "toml", "json"]);
-  const md2 = createMarkdown(highlighter2, "/doc/abc123/asset/");
+  const md2 = createMarkdown(highlighter2, "/doc/abc123/file");
 
   const yaml = md2.render("---\ntitle: Hello\n---\n\n# Body\n");
   expect(yaml).toContain('<details class="mop-frontmatter" open data-source-line="1">');

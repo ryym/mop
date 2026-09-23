@@ -50,7 +50,7 @@ export function collectLanguages(md: MarkdownIt, content: string): string[] {
   return [...langs];
 }
 
-export function createMarkdown(highlighter: Highlighter, assetBase: string): MarkdownIt {
+export function createMarkdown(highlighter: Highlighter, fileEndpoint: string): MarkdownIt {
   const md = new MarkdownIt({
     // Raw HTML in the source is never turned into HTML, and that is what makes
     // a separate sanitizer unnecessary. Changing this flag is a change of the
@@ -77,38 +77,62 @@ export function createMarkdown(highlighter: Highlighter, assetBase: string): Mar
 
   md.use(taskLists, { label: true });
   addSourceLines(md);
-  addAssetPaths(md, assetBase);
+  addFileLinks(md, fileEndpoint);
   addFrontmatter(md, highlighter);
   return md;
 }
 
-// addAssetPaths points relative image sources at the daemon's asset endpoint.
-// The page lives at /doc/<id>, so a bare "img.png" would resolve to the
-// non-existent /doc/img.png instead of the file sitting next to the document.
-//
-// Paths that climb out of the document's directory are left alone: the daemon
-// serves the base directory only, so rewriting them would just produce a
-// different 404.
-function addAssetPaths(md: MarkdownIt, assetBase: string): void {
-  const original =
-    md.renderer.rules.image ??
-    ((tokens, idx, options, _env, self) => self.renderToken(tokens, idx, options));
-
-  md.renderer.rules.image = (tokens, idx, options, env, self) => {
-    const token = tokens[idx]!;
-    const src = token.attrGet("src");
-    if (src !== null && isRelativeAsset(src)) {
-      token.attrSet("src", assetBase + src.replace(/^\.\//, ""));
-    }
-    return original(tokens, idx, options, env, self);
-  };
+// addFileLinks points relative links and image sources at the daemon's file
+// endpoint. The page lives at /doc/<id>, so a bare "img.png" would resolve to
+// the non-existent /doc/img.png instead of the file next to the document.
+function addFileLinks(md: MarkdownIt, fileEndpoint: string): void {
+  for (const [rule, attr] of [
+    ["image", "src"],
+    ["link_open", "href"],
+  ] as const) {
+    const original =
+      md.renderer.rules[rule] ??
+      ((tokens, idx, options, _env, self) => self.renderToken(tokens, idx, options));
+    md.renderer.rules[rule] = (tokens, idx, options, env, self) => {
+      const token = tokens[idx]!;
+      const url = token.attrGet(attr);
+      const rewritten = url === null ? null : toFileUrl(url, fileEndpoint);
+      if (rewritten !== null) token.attrSet(attr, rewritten);
+      return original(tokens, idx, options, env, self);
+    };
+  }
 }
 
-function isRelativeAsset(src: string): boolean {
-  if (src === "" || src.startsWith("/") || src.startsWith("#")) return false;
-  if (src.startsWith("../")) return false;
-  // Anything with a scheme (http:, data:, file:) or protocol relative.
-  return !/^[a-z][a-z0-9+.-]*:/i.test(src) && !src.startsWith("//");
+// toFileUrl returns the file endpoint URL for a relative URL, or null to leave
+// the URL as it is.
+function toFileUrl(url: string, fileEndpoint: string): string | null {
+  if (!isRelative(url)) return null;
+  // Split before decoding, so that an encoded "#" or "?" in a file name stays
+  // part of the path. The fragment is kept for the browser; the query means
+  // nothing to a local file and is dropped.
+  const hashAt = url.indexOf("#");
+  const fragment = hashAt < 0 ? "" : url.slice(hashAt);
+  const path = (hashAt < 0 ? url : url.slice(0, hashAt)).split("?")[0]!;
+  if (path === "") return null;
+  // markdown-it has already percent-encoded the URL, so it is decoded first
+  // to avoid encoding it twice. A malformed escape is left for the browser.
+  let decoded: string;
+  try {
+    decoded = decodeURIComponent(path);
+  } catch {
+    return null;
+  }
+  // The path goes in the query: browsers collapse ".." in a URL path, even
+  // percent-encoded, which would lose "../img.png".
+  return `${fileEndpoint}?path=${encodeURIComponent(decoded)}${fragment}`;
+}
+
+// isRelative reports whether url is a path relative to the document, as
+// opposed to an absolute path, an in-page anchor or an external URL.
+function isRelative(url: string): boolean {
+  if (url === "" || url.startsWith("/") || url.startsWith("#")) return false;
+  // Exclude anything with a scheme (http:, data:, file:) or protocol relative.
+  return !/^[a-z][a-z0-9+.-]*:/i.test(url) && !url.startsWith("//");
 }
 
 // addSourceLines wraps the renderer rules so block elements carry the source
