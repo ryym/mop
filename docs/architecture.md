@@ -45,7 +45,8 @@ are the reference, not this list.
 
 The daemon serves two unrelated kinds of traffic on the same port:
 
-- **The control plane, `/api/`.** JSON, spoken by the CLI only.
+- **The control plane, `/api/`.** JSON, spoken by the CLI only. Browser
+  requests are refused outright.
 - **The preview surface, `/doc/<id>` and `/static/`.** The page, its event
   stream, the bundle, and files sitting next to the document. Spoken by the
   browser only.
@@ -107,6 +108,10 @@ it does not treat localhost as trusted:
 - **Requests must be addressed to the daemon itself**, not merely routed to it.
   This is the DNS rebinding defence: an attacker's domain can resolve to
   127.0.0.1, but the headers still name the attacker.
+- **The control plane refuses any request a browser sends**, even one from the
+  daemon's own origin. Opening a document is reading a file, so a script that
+  reached `/api/` could read anything the user can. Browsers are recognised by
+  `Origin` or `Sec-Fetch-Site`, neither of which the CLI sends.
 - **Local files are served only from the document's own directory**, symlinks
   resolved before the decision.
 - **Sanitizing rests entirely on the Markdown renderer never emitting raw HTML**
