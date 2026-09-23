@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/ryym/mop/internal/api"
+	"github.com/ryym/mop/internal/docpath"
 	"github.com/ryym/mop/internal/state"
 	"github.com/ryym/mop/internal/version"
 	"github.com/ryym/mop/internal/watch"
@@ -161,8 +162,12 @@ func (s *Server) docURL(id string) string {
 }
 
 // openDoc registers a document, reading it from disk, and starts watching it.
-// Opening an already open document just returns it.
+// Opening an already open document just returns it. A file that is not
+// Markdown is refused, whoever asks to open it.
 func (s *Server) openDoc(path string) (*document, error) {
+	if !docpath.IsDocument(path) {
+		return nil, fmt.Errorf("not a Markdown file: %s", path)
+	}
 	s.mu.Lock()
 	if d, ok := s.docs[docID(path)]; ok {
 		s.mu.Unlock()

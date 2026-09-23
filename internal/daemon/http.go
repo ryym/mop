@@ -130,10 +130,6 @@ func (s *Server) handleOpen(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &req) || !validPath(w, req.Path) {
 		return
 	}
-	if !docpath.IsDocument(req.Path) {
-		writeError(w, http.StatusBadRequest, "not a Markdown file: "+req.Path)
-		return
-	}
 	d, err := s.openDoc(req.Path)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
