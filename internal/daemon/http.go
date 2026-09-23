@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/ryym/mop/internal/api"
+	"github.com/ryym/mop/internal/docpath"
 	"github.com/ryym/mop/internal/version"
 	"github.com/ryym/mop/web"
 )
@@ -117,6 +118,10 @@ func validLine(w http.ResponseWriter, line int) bool {
 func (s *Server) handleOpen(w http.ResponseWriter, r *http.Request) {
 	var req api.OpenRequest
 	if !decode(w, r, &req) || !validPath(w, req.Path) {
+		return
+	}
+	if !docpath.IsDocument(req.Path) {
+		writeError(w, http.StatusBadRequest, "not a Markdown file: "+req.Path)
 		return
 	}
 	d, err := s.openDoc(req.Path)

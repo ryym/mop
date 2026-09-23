@@ -106,6 +106,17 @@ func TestOpenListClose(t *testing.T) {
 	}
 }
 
+func TestOpenRejectsNonMarkdown(t *testing.T) {
+	c, _ := startDaemon(t)
+	path := filepath.Join(t.TempDir(), "notes.txt")
+	if err := os.WriteFile(path, []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := c.Open(path); err == nil || !strings.Contains(err.Error(), "not a Markdown file") {
+		t.Fatalf("err = %v, want a not-a-Markdown-file error", err)
+	}
+}
+
 func TestUpdateAndScrollRequireOpenDocument(t *testing.T) {
 	c, _ := startDaemon(t)
 	path := writeDoc(t, "# Hello\n")

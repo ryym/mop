@@ -53,6 +53,10 @@ The daemon serves two unrelated kinds of traffic on the same port:
 
 ### Documents are identified by path
 
+A document is a Markdown file, recognised by its extension (`.md`,
+`.markdown`) alone. The CLI and the daemon apply the same rule, so whatever
+calls the control plane gets the same answer.
+
 The control plane names a document by its absolute path, and the id in its
 preview URL is derived from that path. Nothing else identifies a document: there
 are no handles and no sessions, which is what lets every CLI invocation be a

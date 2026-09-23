@@ -45,6 +45,8 @@ mop list
 mop close README.md
 ```
 
+Only Markdown files (`.md`, `.markdown`) can be opened.
+
 Ports and URLs never need to be typed. The daemon shuts itself down after ten
 minutes with no browser connected, and it can also be managed explicitly:
 

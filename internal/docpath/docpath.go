@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 // Resolve makes a path absolute and resolves symlinks, which is what gives a
@@ -25,4 +26,15 @@ func Resolve(path string) (string, error) {
 		return "", err
 	}
 	return resolved, nil
+}
+
+// IsDocument reports whether a file is one mop previews, judged by its
+// extension alone. .mdx is left out because its JSX cannot be rendered here,
+// and rarer spellings such as .mdown are left out to keep the rule short.
+func IsDocument(path string) bool {
+	switch strings.ToLower(filepath.Ext(path)) {
+	case ".md", ".markdown":
+		return true
+	}
+	return false
 }

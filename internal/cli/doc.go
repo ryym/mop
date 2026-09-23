@@ -9,6 +9,7 @@ import (
 
 	"github.com/ryym/mop/internal/api"
 	"github.com/ryym/mop/internal/client"
+	"github.com/ryym/mop/internal/docpath"
 	"github.com/ryym/mop/internal/state"
 )
 
@@ -66,6 +67,11 @@ func runOpen(args []string) error {
 	path, err := parseFileArgs(fs, args)
 	if err != nil {
 		return err
+	}
+	// Checked before connecting so that a mistyped file never costs a daemon
+	// start. The daemon checks again for callers other than this CLI.
+	if !docpath.IsDocument(path) {
+		return fmt.Errorf("cannot open %s: not a Markdown file", path)
 	}
 	if _, err := os.Stat(path); err != nil {
 		return fmt.Errorf("cannot open %s: %w", path, err)
