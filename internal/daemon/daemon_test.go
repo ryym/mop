@@ -201,33 +201,6 @@ func TestControlPlaneRejectsBrowsers(t *testing.T) {
 	}
 }
 
-func TestAssetIsSandboxed(t *testing.T) {
-	c, port := startDaemon(t)
-	path := writeDoc(t, "# Hello\n")
-	asset := filepath.Join(filepath.Dir(path), "evil.html")
-	if err := os.WriteFile(asset, []byte("<script>alert(1)</script>"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := c.Open(path); err != nil {
-		t.Fatal(err)
-	}
-
-	res, err := http.Get(fmt.Sprintf("http://127.0.0.1:%d/doc/%s/asset/evil.html", port, docID(path)))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer res.Body.Close()
-	if res.StatusCode != http.StatusOK {
-		t.Fatalf("status = %d, want 200", res.StatusCode)
-	}
-	if got := res.Header.Get("Content-Security-Policy"); got != "sandbox" {
-		t.Errorf("Content-Security-Policy = %q, want sandbox", got)
-	}
-	if got := res.Header.Get("X-Content-Type-Options"); got != "nosniff" {
-		t.Errorf("X-Content-Type-Options = %q, want nosniff", got)
-	}
-}
-
 func TestSSEDeliversRefreshAndScroll(t *testing.T) {
 	c, port := startDaemon(t)
 	path := writeDoc(t, "# Hello\n")

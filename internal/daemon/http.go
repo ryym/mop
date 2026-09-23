@@ -36,7 +36,6 @@ func (s *Server) handler() http.Handler {
 	// Preview surface.
 	mux.HandleFunc("GET /doc/{id}", s.handlePage)                        // the preview page
 	mux.HandleFunc("GET /doc/{id}/events", s.handleEvents)               // its SSE stream
-	mux.HandleFunc("GET /doc/{id}/asset/{path...}", s.handleAsset)       // local files next to the document
 	mux.HandleFunc("GET /doc/{id}/file", refuseOtherSites(s.handleFile)) // a file linked from the document
 	mux.HandleFunc("GET /static/", s.handleStatic)                       // the embedded bundle
 
@@ -60,11 +59,11 @@ func (s *Server) checkRequest(next http.Handler) http.Handler {
 			return
 		}
 		// Close the control plane to browsers, our own origin included,
-		// because a script running there (e.g. a local HTML file opened as an
-		// asset) could otherwise open and read any file the user can. The CLI
-		// sends neither header. Check Sec-Fetch-Site too because browsers may
-		// omit Origin on same-origin GETs, while current ones send
-		// Sec-Fetch-Site on every request.
+		// because a script running there (e.g. a local HTML file linked from
+		// a document) could otherwise open and read any file the user can.
+		// The CLI sends neither header. Check Sec-Fetch-Site too because
+		// browsers may omit Origin on same-origin GETs, while current ones
+		// send Sec-Fetch-Site on every request.
 		if strings.HasPrefix(r.URL.Path, "/api/") &&
 			(r.Header.Get("Origin") != "" || r.Header.Get("Sec-Fetch-Site") != "") {
 			writeError(w, http.StatusForbidden, "the control plane does not accept browser requests")
@@ -310,47 +309,6 @@ func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
 func writeEvent(w http.ResponseWriter, f http.Flusher, ev event) {
 	_, _ = fmt.Fprintf(w, "event: %s\ndata: %s\n\n", ev.name, ev.data)
 	f.Flush()
-}
-
-// handleAsset serves local files (images and such) relative to the
-// document's base directory only. The daemon's own cwd is unrelated to the
-// document, so relative paths must always resolve against that base.
-func (s *Server) handleAsset(w http.ResponseWriter, r *http.Request) {
-	d, ok := s.getDocByID(r.PathValue("id"))
-	if !ok {
-		http.NotFound(w, r)
-		return
-	}
-	rel := r.PathValue("path")
-	target := filepath.Join(d.baseDir, filepath.FromSlash(rel))
-
-	// Reject anything that escapes the base directory, symlinks included.
-	base, err := filepath.EvalSymlinks(d.baseDir)
-	if err != nil {
-		http.NotFound(w, r)
-		return
-	}
-	resolved, err := filepath.EvalSymlinks(target)
-	if err != nil {
-		http.NotFound(w, r)
-		return
-	}
-	if resolved != base && !strings.HasPrefix(resolved, base+string(filepath.Separator)) {
-		writeError(w, http.StatusForbidden, "asset is outside the document directory")
-		return
-	}
-	// Sandbox the asset because it comes from whatever repository the user is
-	// previewing, yet is served on the daemon's origin. Browsers ignore CSP on
-	// subresources, so <img> in the preview is unaffected.
-	w.Header().Set("Content-Security-Policy", "sandbox")
-	// Disable sniffing so the browser cannot reinterpret a file as a type the
-	// sandbox was not expected to cover.
-	w.Header().Set("X-Content-Type-Options", "nosniff")
-	// Revalidate rather than serve from cache: an image edited next to the
-	// document has to show up in the preview. ServeFile still answers 304
-	// while the file is unchanged.
-	w.Header().Set("Cache-Control", "no-cache")
-	http.ServeFile(w, r, resolved)
 }
 
 // handleFile resolves a relative link found in a document. A Markdown target is
