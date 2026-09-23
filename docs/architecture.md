@@ -114,6 +114,10 @@ it does not treat localhost as trusted:
   `Origin` or `Sec-Fetch-Site`, neither of which the CLI sends.
 - **Local files are served only from the document's own directory**, symlinks
   resolved before the decision.
+- **Local files are sandboxed.** They come from whatever repository is being
+  previewed, so an HTML or SVG file opened as a page must not run scripts on
+  the daemon's origin. Asset responses carry `Content-Security-Policy: sandbox`
+  and `nosniff`; images in the preview are unaffected.
 - **Sanitizing rests entirely on the Markdown renderer never emitting raw HTML**
   — see [frontend.md](./frontend.md).
 

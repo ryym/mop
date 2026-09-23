@@ -313,6 +313,13 @@ func (s *Server) handleAsset(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusForbidden, "asset is outside the document directory")
 		return
 	}
+	// Sandbox the asset because it comes from whatever repository the user is
+	// previewing, yet is served on the daemon's origin. Browsers ignore CSP on
+	// subresources, so <img> in the preview is unaffected.
+	w.Header().Set("Content-Security-Policy", "sandbox")
+	// Disable sniffing so the browser cannot reinterpret a file as a type the
+	// sandbox was not expected to cover.
+	w.Header().Set("X-Content-Type-Options", "nosniff")
 	// Revalidate rather than serve from cache: an image edited next to the
 	// document has to show up in the preview. ServeFile still answers 304
 	// while the file is unchanged.
