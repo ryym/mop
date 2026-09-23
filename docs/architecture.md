@@ -126,13 +126,16 @@ it does not treat localhost as trusted:
   daemon's own origin. Opening a document is reading a file, so a script that
   reached `/api/` could read anything the user can. Browsers are recognised by
   `Origin` or `Sec-Fetch-Site`, neither of which the CLI sends.
+- **Nothing answers a request another site makes the browser send.** A
+  foreign page could otherwise probe for files through `<img>`, make the
+  daemon open documents by navigating to a link, tell which documents are open
+  by whether their pages load, or keep the daemon alive by holding an event
+  stream open. Requests whose `Sec-Fetch-Site` is `cross-site` or `same-site`
+  are refused everywhere. The preview itself, the address bar, bookmarks and
+  non-browser clients are not affected; a preview URL linked from another site
+  does not open.
 - **Local files are served only from the document's git repository**, or its
   own directory outside of one, symlinks resolved before the decision.
-- **Local files are not served to other sites.** A foreign page could otherwise
-  probe for files through `<img>`, or make the daemon open documents by
-  navigating to a link. Requests whose `Sec-Fetch-Site` is `cross-site` or
-  `same-site` are refused; the preview itself, the address bar and
-  non-browser clients are not affected. The preview page is not restricted.
 - **Local files are sandboxed.** They come from whatever repository is being
   previewed, so an HTML or SVG file opened as a page must not run scripts on
   the daemon's origin. File responses carry `Content-Security-Policy: sandbox`

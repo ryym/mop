@@ -221,36 +221,6 @@ func TestFileRootFromGitFile(t *testing.T) {
 	wantStatus(t, f.get(t, "../top.txt", ""), http.StatusOK)
 }
 
-func TestFileChecksSecFetchSite(t *testing.T) {
-	f := newFileFixture(t, true)
-	writeFile(t, filepath.Join(f.repo, "docs", "a.txt"), "x")
-
-	for site, want := range map[string]int{
-		"same-origin": http.StatusOK,
-		"none":        http.StatusOK,
-		"":            http.StatusOK,
-		"same-site":   http.StatusForbidden,
-		"cross-site":  http.StatusForbidden,
-	} {
-		t.Run("site="+site, func(t *testing.T) {
-			wantStatus(t, f.get(t, "a.txt", site), want)
-		})
-	}
-}
-
-// The preview page stays reachable from anywhere, links included.
-func TestPageIgnoresSecFetchSite(t *testing.T) {
-	f := newFileFixture(t, true)
-	req, _ := http.NewRequest(http.MethodGet, fmt.Sprintf("http://127.0.0.1:%d/doc/%s", f.port, docID(f.doc)), nil)
-	req.Header.Set("Sec-Fetch-Site", "cross-site")
-	res, err := http.DefaultClient.Do(req)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer res.Body.Close()
-	wantStatus(t, res, http.StatusOK)
-}
-
 func TestFileRejectsBadPaths(t *testing.T) {
 	f := newFileFixture(t, true)
 	mkdir(t, filepath.Join(f.repo, "docs", "sub"))

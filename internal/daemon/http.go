@@ -34,17 +34,17 @@ func (s *Server) handler() http.Handler {
 	mux.HandleFunc("GET /api/status", s.handleStatus)      // version, port, uptime; also the liveness probe
 
 	// Preview surface.
-	mux.HandleFunc("GET /doc/{id}", s.handlePage)                        // the preview page
-	mux.HandleFunc("GET /doc/{id}/events", s.handleEvents)               // its SSE stream
-	mux.HandleFunc("GET /doc/{id}/file", refuseOtherSites(s.handleFile)) // a file linked from the document
-	mux.HandleFunc("GET /static/", s.handleStatic)                       // the embedded bundle
+	mux.HandleFunc("GET /doc/{id}", s.handlePage)          // the preview page
+	mux.HandleFunc("GET /doc/{id}/events", s.handleEvents) // its SSE stream
+	mux.HandleFunc("GET /doc/{id}/file", s.handleFile)     // a file linked from the document
+	mux.HandleFunc("GET /static/", s.handleStatic)         // the embedded bundle
 
 	return s.checkRequest(mux)
 }
 
 // checkRequest rejects requests addressed to a Host other than the daemon's
-// own, and any browser request to the control plane, including one from the
-// daemon's own origin.
+// own, any browser request to the control plane, including one from the
+// daemon's own origin, and any request another site makes the browser send.
 func (s *Server) checkRequest(next http.Handler) http.Handler {
 	allowedHosts := map[string]bool{
 		fmt.Sprintf("127.0.0.1:%d", s.port): true,
@@ -69,25 +69,15 @@ func (s *Server) checkRequest(next http.Handler) http.Handler {
 			writeError(w, http.StatusForbidden, "the control plane does not accept browser requests")
 			return
 		}
-		next.ServeHTTP(w, r)
-	})
-}
-
-// refuseOtherSites rejects requests the browser marks as coming from another
-// site. Any web page can point the browser at the daemon, to probe for files
-// through <img> or to make it open documents by navigating. Neither
-// cross-site nor same-site requests are ours: the preview is same-origin, and
-// the address bar sends "none". A page cannot forge either value. Non-browser
-// clients send no header and are let through.
-func refuseOtherSites(next http.HandlerFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
+		// Refuse whatever another site makes the browser request.
+		// mop is purely a local preview tool.
 		switch r.Header.Get("Sec-Fetch-Site") {
 		case "cross-site", "same-site":
 			writeError(w, http.StatusForbidden, "requests from other sites are refused")
 			return
 		}
-		next(w, r)
-	}
+		next.ServeHTTP(w, r)
+	})
 }
 
 func writeJSON(w http.ResponseWriter, status int, body any) {

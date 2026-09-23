@@ -201,6 +201,50 @@ func TestControlPlaneRejectsBrowsers(t *testing.T) {
 	}
 }
 
+// Nothing on the preview surface answers a request another site makes the
+// browser send, while the preview itself, the address bar and non-browser
+// clients get through.
+func TestPreviewRejectsOtherSites(t *testing.T) {
+	f := newFileFixture(t, true)
+	writeFile(t, filepath.Join(f.repo, "docs", "a.txt"), "x")
+	id := docID(f.doc)
+
+	paths := []string{"/doc/" + id, "/doc/" + id + "/file?path=a.txt", "/static/mop.js"}
+	sites := map[string]int{
+		"same-origin": http.StatusOK,
+		"none":        http.StatusOK,
+		"":            http.StatusOK,
+		"same-site":   http.StatusForbidden,
+		"cross-site":  http.StatusForbidden,
+	}
+	for _, path := range paths {
+		for site, want := range sites {
+			t.Run(path+" site="+site, func(t *testing.T) {
+				req, _ := http.NewRequest(http.MethodGet, fmt.Sprintf("http://127.0.0.1:%d%s", f.port, path), nil)
+				if site != "" {
+					req.Header.Set("Sec-Fetch-Site", site)
+				}
+				res, err := http.DefaultClient.Do(req)
+				if err != nil {
+					t.Fatal(err)
+				}
+				defer res.Body.Close()
+				wantStatus(t, res, want)
+			})
+		}
+	}
+
+	// The event stream is only checked for refusal: an accepted one never ends.
+	req, _ := http.NewRequest(http.MethodGet, fmt.Sprintf("http://127.0.0.1:%d/doc/%s/events", f.port, id), nil)
+	req.Header.Set("Sec-Fetch-Site", "cross-site")
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer res.Body.Close()
+	wantStatus(t, res, http.StatusForbidden)
+}
+
 func TestSSEDeliversRefreshAndScroll(t *testing.T) {
 	c, port := startDaemon(t)
 	path := writeDoc(t, "# Hello\n")

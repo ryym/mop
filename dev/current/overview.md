@@ -48,11 +48,14 @@ Security:
 - Any web page can make the browser request the daemon's file URLs. It could
   embed them to probe which files exist, or navigate to one to make the
   daemon register and watch arbitrary documents.
-- To stop this, file requests that the browser marks as coming from another
-  site (`Sec-Fetch-Site` of `cross-site` or `same-site`) are refused. The
-  preview itself, the address bar and non-browser clients are allowed; an
-  attacker's page can pose as none of them. The preview page is not
-  restricted, so it stays openable from anywhere.
+- To stop this, every request that the browser marks as coming from another
+  site (`Sec-Fetch-Site` of `cross-site` or `same-site`) is refused, not only
+  file requests. The preview pages had smaller leaks of the same kind: a
+  foreign page could tell which documents are open by whether their pages
+  load, and hold an event stream open to keep the daemon alive. The preview
+  itself, the address bar, bookmarks and non-browser clients are allowed; an
+  attacker's page can pose as none of them. The cost is that a preview URL
+  linked from another site no longer opens.
 - As defence in depth, files are served only from the document's git
   repository, or its directory when there is none.
 - Served files stay sandboxed, so the wider range does not let an HTML or SVG
@@ -73,6 +76,6 @@ Out of scope:
 - **Link-opened previews after a daemon restart.** A restarted daemon has no
   documents registered, so an open preview tab gets 404 on reload. A document
   opened from the CLI comes back with another `mop open`, but a link-opened
-  one is not something the user opened from the CLI in the first place. The daemon cannot
-  re-register it from the URL alone either, because the id in the URL is a
-  hash of the file path.
+  one is not something the user opened from the CLI in the first place. The
+  daemon cannot re-register it from the URL alone either, because the id in
+  the URL is a hash of the file path.
