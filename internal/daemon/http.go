@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"html/template"
-	"io"
 	"io/fs"
 	"net/http"
 	"os"
@@ -327,15 +326,7 @@ func (s *Server) handleFile(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusForbidden, "file is outside the document's repository")
 		return
 	}
-	// Open the file once and serve it from the handle, so that the file
-	// checked here is the file that is sent.
-	f, err := os.Open(target)
-	if err != nil {
-		http.NotFound(w, r)
-		return
-	}
-	defer f.Close()
-	info, err := f.Stat()
+	info, err := os.Stat(target)
 	if err != nil || info.IsDir() {
 		http.NotFound(w, r)
 		return
@@ -355,30 +346,7 @@ func (s *Server) handleFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	head, err := readHead(f)
-	if err == nil {
-		_, err = f.Seek(0, io.SeekStart)
-	}
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	setFileHeaders(w.Header(), target, head, info.Size())
-	// Sandbox the file because it comes from whatever repository the user is
-	// previewing, yet is served on the daemon's origin. Browsers ignore CSP on
-	// subresources, so <img> in the preview is unaffected.
-	w.Header().Set("Content-Security-Policy", "sandbox")
-	// Disable sniffing so the browser cannot reinterpret a file as a type the
-	// sandbox was not expected to cover, or as anything other than the type
-	// setFileHeaders chose.
-	w.Header().Set("X-Content-Type-Options", "nosniff")
-	// Revalidate rather than serve from cache: an image edited next to the
-	// document has to show up in the preview. ServeContent still answers 304
-	// while the file is unchanged.
-	w.Header().Set("Cache-Control", "no-cache")
-	// Pass no name: ServeContent uses it only to guess a type, which is set
-	// already.
-	http.ServeContent(w, r, "", info.ModTime(), f)
+	serveFile(w, r, target)
 }
 
 func (s *Server) handleStatic(w http.ResponseWriter, r *http.Request) {

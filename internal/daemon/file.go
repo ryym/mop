@@ -4,10 +4,54 @@ import (
 	"bytes"
 	"io"
 	"net/http"
+	"os"
 	"path/filepath"
 	"strings"
 	"unicode/utf8"
 )
+
+// serveFile sends a file linked from a document as it is, sandboxed, with the
+// headers setFileHeaders decides for it. A file that cannot be read gets 404.
+func serveFile(w http.ResponseWriter, r *http.Request, path string) {
+	// Inspect and send the file through one handle, so that the file whose
+	// type is decided is the file that is sent.
+	f, err := os.Open(path)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	defer f.Close()
+	info, err := f.Stat()
+	if err != nil || info.IsDir() {
+		http.NotFound(w, r)
+		return
+	}
+	head, err := readHead(f)
+	if err == nil {
+		_, err = f.Seek(0, io.SeekStart)
+	}
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	setFileHeaders(w.Header(), path, head, info.Size())
+	// Sandbox the file because it comes from whatever repository the user is
+	// previewing, yet is served on the daemon's origin. Browsers ignore CSP on
+	// subresources, so <img> in the preview is unaffected.
+	w.Header().Set("Content-Security-Policy", "sandbox")
+	// Disable sniffing so the browser cannot reinterpret a file as a type the
+	// sandbox was not expected to cover, or as anything other than the type
+	// setFileHeaders chose.
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	// Revalidate rather than serve from cache: an image edited next to the
+	// document has to show up in the preview. ServeContent still answers 304
+	// while the file is unchanged.
+	w.Header().Set("Cache-Control", "no-cache")
+	// Pass no name: ServeContent uses it only to guess a type, which is set
+	// already.
+	http.ServeContent(w, r, "", info.ModTime(), f)
+}
 
 // imageTypes are the files a browser displays as they are. Only images are
 // listed: anything else is either text, shown as such, or downloaded. Types
