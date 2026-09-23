@@ -70,6 +70,11 @@ export function createMarkdown(highlighter: Highlighter, assetBase: string): Mar
     },
   });
 
+  // Only link text that carries a scheme.
+  // Fuzzy matching accepts any two letter TLD, so a bare "README.md" would
+  // become a link to http://README.md (.md is Moldova's TLD).
+  md.linkify.set({ fuzzyLink: false });
+
   md.use(taskLists, { label: true });
   addSourceLines(md);
   addAssetPaths(md, assetBase);

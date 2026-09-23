@@ -40,6 +40,13 @@ test("absolute and escaping image sources are left alone", () => {
   expect(html).toContain('src="data:image/png;base64,AA"');
 });
 
+test("only text with a scheme is linkified", () => {
+  const html = md.render("see README.md, www.example.com and https://example.com\n");
+  expect(html).not.toContain('href="http://README.md"');
+  expect(html).not.toContain('href="http://www.example.com"');
+  expect(html).toContain('href="https://example.com"');
+});
+
 test("mermaid fences are left for the browser to draw", () => {
   expect(md.render("```mermaid\ngraph TD; A-->B;\n```\n")).toContain(
     '<pre class="mermaid">graph TD; A--&gt;B;',
