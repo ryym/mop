@@ -1,0 +1,28 @@
+// Package docpath holds the decisions about document paths that the CLI and the
+// daemon must agree on.
+package docpath
+
+import (
+	"errors"
+	"os"
+	"path/filepath"
+)
+
+// Resolve makes a path absolute and resolves symlinks, which is what gives a
+// document its identity.
+func Resolve(path string) (string, error) {
+	abs, err := filepath.Abs(path)
+	if err != nil {
+		return "", err
+	}
+	resolved, err := filepath.EvalSymlinks(abs)
+	if err != nil {
+		// The file may be gone (e.g. `mop close` after a delete). The
+		// absolute path is still a usable identifier for the daemon.
+		if errors.Is(err, os.ErrNotExist) {
+			return abs, nil
+		}
+		return "", err
+	}
+	return resolved, nil
+}
