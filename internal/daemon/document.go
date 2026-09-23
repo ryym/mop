@@ -20,7 +20,7 @@ func docID(path string) string {
 type document struct {
 	id      string
 	path    string
-	baseDir string // resolves the document's relative assets
+	baseDir string // resolves the document's relative links
 	content string // the raw Markdown, as received or read from disk
 }
 
@@ -62,4 +62,33 @@ func (d *document) displayPath() string {
 // index.md) rarely tell two tabs apart.
 func (d *document) title() string {
 	return filepath.Join(filepath.Base(d.baseDir), filepath.Base(d.path))
+}
+
+// servingRoot is the directory a document's links may reach, with symlinks
+// resolved: the enclosing git repository, so that links between a repository's
+// files work, or the document's own directory outside of one.
+func servingRoot(baseDir string) string {
+	// Resolve symlinks so that the root compares against resolved link targets.
+	base, err := filepath.EvalSymlinks(baseDir)
+	if err != nil {
+		return baseDir
+	}
+	for dir := base; ; {
+		// Lstat rather than look for a directory, because .git is a file in
+		// worktrees and submodules.
+		if _, err := os.Lstat(filepath.Join(dir, ".git")); err == nil {
+			return dir
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return base
+		}
+		dir = parent
+	}
+}
+
+// contains reports whether path is root itself or lies beneath it.
+func contains(root, path string) bool {
+	rel, err := filepath.Rel(root, path)
+	return err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
 }

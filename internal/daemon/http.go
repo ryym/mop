@@ -4,8 +4,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"html/template"
+	"io"
 	"io/fs"
 	"net/http"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -32,10 +34,11 @@ func (s *Server) handler() http.Handler {
 	mux.HandleFunc("GET /api/status", s.handleStatus)      // version, port, uptime; also the liveness probe
 
 	// Preview surface.
-	mux.HandleFunc("GET /doc/{id}", s.handlePage)                  // the preview page
-	mux.HandleFunc("GET /doc/{id}/events", s.handleEvents)         // its SSE stream
-	mux.HandleFunc("GET /doc/{id}/asset/{path...}", s.handleAsset) // local files next to the document
-	mux.HandleFunc("GET /static/", s.handleStatic)                 // the embedded bundle
+	mux.HandleFunc("GET /doc/{id}", s.handlePage)                        // the preview page
+	mux.HandleFunc("GET /doc/{id}/events", s.handleEvents)               // its SSE stream
+	mux.HandleFunc("GET /doc/{id}/asset/{path...}", s.handleAsset)       // local files next to the document
+	mux.HandleFunc("GET /doc/{id}/file", refuseOtherSites(s.handleFile)) // a file linked from the document
+	mux.HandleFunc("GET /static/", s.handleStatic)                       // the embedded bundle
 
 	return s.checkRequest(mux)
 }
@@ -71,6 +74,23 @@ func (s *Server) checkRequest(next http.Handler) http.Handler {
 	})
 }
 
+// refuseOtherSites rejects requests the browser marks as coming from another
+// site. Any web page can point the browser at the daemon, to probe for files
+// through <img> or to make it open documents by navigating. Neither
+// cross-site nor same-site requests are ours: the preview is same-origin, and
+// the address bar sends "none". A page cannot forge either value. Non-browser
+// clients send no header and are let through.
+func refuseOtherSites(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		switch r.Header.Get("Sec-Fetch-Site") {
+		case "cross-site", "same-site":
+			writeError(w, http.StatusForbidden, "requests from other sites are refused")
+			return
+		}
+		next(w, r)
+	}
+}
+
 func writeJSON(w http.ResponseWriter, status int, body any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
@@ -89,8 +109,9 @@ func decode(w http.ResponseWriter, r *http.Request, out any) bool {
 	return true
 }
 
-// validPath rejects anything that is not an absolute path. Resolving symlinks
-// is the CLI's job; the daemon takes the path it is given as the identity.
+// validPath rejects anything that is not an absolute path. A path on the control
+// plane has its symlinks resolved by the CLI, so the daemon takes it as the
+// identity as it is.
 func validPath(w http.ResponseWriter, path string) bool {
 	if path == "" || !filepath.IsAbs(path) {
 		writeError(w, http.StatusBadRequest, "path must be an absolute path")
@@ -330,6 +351,90 @@ func (s *Server) handleAsset(w http.ResponseWriter, r *http.Request) {
 	// while the file is unchanged.
 	w.Header().Set("Cache-Control", "no-cache")
 	http.ServeFile(w, r, resolved)
+}
+
+// handleFile resolves a relative link found in a document. A Markdown target is
+// registered and the browser is redirected to its preview; anything else is
+// served as a file. The path comes in the query because browsers collapse ".."
+// in a URL path, percent-encoded or not.
+func (s *Server) handleFile(w http.ResponseWriter, r *http.Request) {
+	d, ok := s.getDocByID(r.PathValue("id"))
+	if !ok {
+		http.NotFound(w, r)
+		return
+	}
+	rel := r.URL.Query().Get("path")
+	if rel == "" || filepath.IsAbs(rel) {
+		writeError(w, http.StatusBadRequest, "path must be a relative path")
+		return
+	}
+	// Resolved exactly like a path given to the CLI, so that a document
+	// reached through a symlink keeps the identity it has there.
+	target, err := docpath.Resolve(filepath.Join(d.baseDir, filepath.FromSlash(rel)))
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	// Refuse files outside the serving root, worked out on every request
+	// rather than kept from when the document was opened. That follows a
+	// repository created afterwards, and a few stats cost nothing next to
+	// serving the file.
+	if !contains(servingRoot(d.baseDir), target) {
+		writeError(w, http.StatusForbidden, "file is outside the document's repository")
+		return
+	}
+	// Open the file once and serve it from the handle, so that the file
+	// checked here is the file that is sent.
+	f, err := os.Open(target)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	defer f.Close()
+	info, err := f.Stat()
+	if err != nil || info.IsDir() {
+		http.NotFound(w, r)
+		return
+	}
+
+	if docpath.IsDocument(target) {
+		linked, err := s.openDoc(target)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		s.log.Info("document opened from a link", "path", linked.path)
+		// Relative, unlike docURL: a tab on localhost must not be moved to
+		// 127.0.0.1, where it would be a different origin and its links
+		// would count as same-site.
+		http.Redirect(w, r, "/doc/"+linked.id, http.StatusSeeOther)
+		return
+	}
+
+	head, err := readHead(f)
+	if err == nil {
+		_, err = f.Seek(0, io.SeekStart)
+	}
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	setFileHeaders(w.Header(), target, head, info.Size())
+	// Sandbox the file because it comes from whatever repository the user is
+	// previewing, yet is served on the daemon's origin. Browsers ignore CSP on
+	// subresources, so <img> in the preview is unaffected.
+	w.Header().Set("Content-Security-Policy", "sandbox")
+	// Disable sniffing so the browser cannot reinterpret a file as a type the
+	// sandbox was not expected to cover, or as anything other than the type
+	// setFileHeaders chose.
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	// Revalidate rather than serve from cache: an image edited next to the
+	// document has to show up in the preview. ServeContent still answers 304
+	// while the file is unchanged.
+	w.Header().Set("Cache-Control", "no-cache")
+	// Pass no name: ServeContent uses it only to guess a type, which is set
+	// already.
+	http.ServeContent(w, r, "", info.ModTime(), f)
 }
 
 func (s *Server) handleStatic(w http.ResponseWriter, r *http.Request) {

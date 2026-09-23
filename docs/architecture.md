@@ -22,7 +22,7 @@ browser.
 | Component | Responsibility                                                    |
 | --------- | ----------------------------------------------------------------- |
 | CLI       | Resolving paths, ensuring a daemon is up, calling the daemon      |
-| Daemon    | Watching files, holding and serving raw text, serving assets      |
+| Daemon    | Watching files, holding and serving raw text, serving local files |
 | Browser   | Parsing, highlighting, patching the DOM, deciding where to scroll |
 
 The payoff is that Markdown features are a frontend-only concern: mermaid
@@ -48,22 +48,31 @@ The daemon serves two unrelated kinds of traffic on the same port:
 - **The control plane, `/api/`.** JSON, spoken by the CLI only. Browser
   requests are refused outright.
 - **The preview surface, `/doc/<id>` and `/static/`.** The page, its event
-  stream, the bundle, and files sitting next to the document. Spoken by the
+  stream, the bundle, and the files the document links to. Spoken by the
   browser only.
 
 ### Documents are identified by path
 
 A document is a Markdown file, recognised by its extension (`.md`,
-`.markdown`) alone. The CLI and the daemon apply the same rule, so whatever
-calls the control plane gets the same answer.
+`.markdown`) alone. `mop open`, the control plane and links all apply the same
+rule, so a file that opens one way opens every way.
 
 The control plane names a document by its absolute path, and the id in its
 preview URL is derived from that path. Nothing else identifies a document: there
 are no handles and no sessions, which is what lets every CLI invocation be a
 fresh process, and what keeps a preview URL valid across daemon restarts.
 
-Normalising the path is the CLI's job. The daemon treats the path it receives as
-the identity as-is.
+### Links between files
+
+`/doc/<id>/file?path=<relative path>` resolves a path relative to the
+document. The path goes in the query because browsers collapse `..` in a URL
+path, even percent-encoded. The daemon looks only at the target's extension:
+
+- **A Markdown document** is opened as if by `mop open`, and the browser is
+  redirected to its preview.
+- **Anything else** is served as a file: common images as images, PDFs as
+  downloads, other UTF-8 as plain text (HTML included), and the rest as
+  downloads.
 
 ### Pushing to the browser
 
@@ -116,11 +125,16 @@ it does not treat localhost as trusted:
   daemon's own origin. Opening a document is reading a file, so a script that
   reached `/api/` could read anything the user can. Browsers are recognised by
   `Origin` or `Sec-Fetch-Site`, neither of which the CLI sends.
-- **Local files are served only from the document's own directory**, symlinks
-  resolved before the decision.
+- **Local files are served only from the document's git repository**, or its
+  own directory outside of one, symlinks resolved before the decision.
+- **Local files are not served to other sites.** A foreign page could otherwise
+  probe for files through `<img>`, or make the daemon open documents by
+  navigating to a link. Requests whose `Sec-Fetch-Site` is `cross-site` or
+  `same-site` are refused; the preview itself, the address bar and
+  non-browser clients are not affected. The preview page is not restricted.
 - **Local files are sandboxed.** They come from whatever repository is being
   previewed, so an HTML or SVG file opened as a page must not run scripts on
-  the daemon's origin. Asset responses carry `Content-Security-Policy: sandbox`
+  the daemon's origin. File responses carry `Content-Security-Policy: sandbox`
   and `nosniff`; images in the preview are unaffected.
 - **Sanitizing rests entirely on the Markdown renderer never emitting raw HTML**
   — see [frontend.md](./frontend.md).

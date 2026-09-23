@@ -29,8 +29,8 @@ func Resolve(path string) (string, error) {
 }
 
 // IsDocument reports whether a file is one mop previews, judged by its
-// extension alone. .mdx is left out because its JSX cannot be rendered here,
-// and rarer spellings such as .mdown are left out to keep the rule short.
+// extension alone. Only `.md` or `.markdown` is a previewable document.
+// `.mdx` is not supported since mop cannot render JSX.
 func IsDocument(path string) bool {
 	switch strings.ToLower(filepath.Ext(path)) {
 	case ".md", ".markdown":
