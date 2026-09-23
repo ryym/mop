@@ -39,30 +39,32 @@ func (s *Server) handler() http.Handler {
 	return s.checkRequest(mux)
 }
 
-// checkRequest is the DNS rebinding defence. A malicious page can point its
-// own domain at 127.0.0.1 and reach this server from the browser, but the
-// Host header stays the attacker's domain, and its Origin is not ours.
+// checkRequest rejects requests addressed to a Host other than the daemon's
+// own, and any browser request to the control plane, including one from the
+// daemon's own origin.
 func (s *Server) checkRequest(next http.Handler) http.Handler {
 	allowedHosts := map[string]bool{
 		fmt.Sprintf("127.0.0.1:%d", s.port): true,
 		fmt.Sprintf("localhost:%d", s.port): true,
 	}
-	allowedOrigins := map[string]bool{
-		fmt.Sprintf("http://127.0.0.1:%d", s.port): true,
-		fmt.Sprintf("http://localhost:%d", s.port): true,
-	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Reject a foreign Host to defend against DNS rebinding: a malicious
+		// page can point its own domain at 127.0.0.1 and reach this server,
+		// but the Host header stays the attacker's domain.
 		if !allowedHosts[r.Host] {
 			writeError(w, http.StatusForbidden, "invalid Host header")
 			return
 		}
-		if strings.HasPrefix(r.URL.Path, "/api/") {
-			// The CLI sends no Origin at all; only a browser does, and then
-			// it must be ours.
-			if origin := r.Header.Get("Origin"); origin != "" && !allowedOrigins[origin] {
-				writeError(w, http.StatusForbidden, "invalid Origin header")
-				return
-			}
+		// Close the control plane to browsers, our own origin included,
+		// because a script running there (e.g. a local HTML file opened as an
+		// asset) could otherwise open and read any file the user can. The CLI
+		// sends neither header. Check Sec-Fetch-Site too because browsers may
+		// omit Origin on same-origin GETs, while current ones send
+		// Sec-Fetch-Site on every request.
+		if strings.HasPrefix(r.URL.Path, "/api/") &&
+			(r.Header.Get("Origin") != "" || r.Header.Get("Sec-Fetch-Site") != "") {
+			writeError(w, http.StatusForbidden, "the control plane does not accept browser requests")
+			return
 		}
 		next.ServeHTTP(w, r)
 	})
@@ -311,6 +313,13 @@ func (s *Server) handleAsset(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusForbidden, "asset is outside the document directory")
 		return
 	}
+	// Sandbox the asset because it comes from whatever repository the user is
+	// previewing, yet is served on the daemon's origin. Browsers ignore CSP on
+	// subresources, so <img> in the preview is unaffected.
+	w.Header().Set("Content-Security-Policy", "sandbox")
+	// Disable sniffing so the browser cannot reinterpret a file as a type the
+	// sandbox was not expected to cover.
+	w.Header().Set("X-Content-Type-Options", "nosniff")
 	// Revalidate rather than serve from cache: an image edited next to the
 	// document has to show up in the preview. ServeFile still answers 304
 	// while the file is unchanged.

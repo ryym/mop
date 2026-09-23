@@ -157,19 +157,63 @@ func TestRejectsForeignHost(t *testing.T) {
 	}
 }
 
-func TestRejectsForeignOrigin(t *testing.T) {
-	c, port := startDaemon(t)
-	_ = c
+func TestControlPlaneRejectsBrowsers(t *testing.T) {
+	_, port := startDaemon(t)
 
-	req, _ := http.NewRequest(http.MethodGet, fmt.Sprintf("http://127.0.0.1:%d/api/docs", port), nil)
-	req.Header.Set("Origin", "https://evil.example.com")
-	res, err := http.DefaultClient.Do(req)
+	cases := []struct {
+		name   string
+		header string
+		value  string
+		want   int
+	}{
+		{"no browser headers", "", "", http.StatusOK},
+		{"foreign Origin", "Origin", "https://evil.example.com", http.StatusForbidden},
+		{"own Origin", "Origin", fmt.Sprintf("http://127.0.0.1:%d", port), http.StatusForbidden},
+		{"Sec-Fetch-Site same-origin", "Sec-Fetch-Site", "same-origin", http.StatusForbidden},
+		{"Sec-Fetch-Site none", "Sec-Fetch-Site", "none", http.StatusForbidden},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			req, _ := http.NewRequest(http.MethodGet, fmt.Sprintf("http://127.0.0.1:%d/api/docs", port), nil)
+			if tc.header != "" {
+				req.Header.Set(tc.header, tc.value)
+			}
+			res, err := http.DefaultClient.Do(req)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer res.Body.Close()
+			if res.StatusCode != tc.want {
+				t.Fatalf("status = %d, want %d", res.StatusCode, tc.want)
+			}
+		})
+	}
+}
+
+func TestAssetIsSandboxed(t *testing.T) {
+	c, port := startDaemon(t)
+	path := writeDoc(t, "# Hello\n")
+	asset := filepath.Join(filepath.Dir(path), "evil.html")
+	if err := os.WriteFile(asset, []byte("<script>alert(1)</script>"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := c.Open(path); err != nil {
+		t.Fatal(err)
+	}
+
+	res, err := http.Get(fmt.Sprintf("http://127.0.0.1:%d/doc/%s/asset/evil.html", port, docID(path)))
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer res.Body.Close()
-	if res.StatusCode != http.StatusForbidden {
-		t.Fatalf("status = %d, want 403", res.StatusCode)
+	if res.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, want 200", res.StatusCode)
+	}
+	if got := res.Header.Get("Content-Security-Policy"); got != "sandbox" {
+		t.Errorf("Content-Security-Policy = %q, want sandbox", got)
+	}
+	if got := res.Header.Get("X-Content-Type-Options"); got != "nosniff" {
+		t.Errorf("X-Content-Type-Options = %q, want nosniff", got)
 	}
 }
 
