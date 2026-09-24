@@ -6,11 +6,13 @@ import (
 	"html/template"
 	"io/fs"
 	"net/http"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/ryym/mop/internal/api"
+	"github.com/ryym/mop/internal/docpath"
 	"github.com/ryym/mop/internal/version"
 	"github.com/ryym/mop/web"
 )
@@ -31,17 +33,17 @@ func (s *Server) handler() http.Handler {
 	mux.HandleFunc("GET /api/status", s.handleStatus)      // version, port, uptime; also the liveness probe
 
 	// Preview surface.
-	mux.HandleFunc("GET /doc/{id}", s.handlePage)                  // the preview page
-	mux.HandleFunc("GET /doc/{id}/events", s.handleEvents)         // its SSE stream
-	mux.HandleFunc("GET /doc/{id}/asset/{path...}", s.handleAsset) // local files next to the document
-	mux.HandleFunc("GET /static/", s.handleStatic)                 // the embedded bundle
+	mux.HandleFunc("GET /doc/{id}", s.handlePage)          // the preview page
+	mux.HandleFunc("GET /doc/{id}/events", s.handleEvents) // its SSE stream
+	mux.HandleFunc("GET /doc/{id}/file", s.handleFile)     // a file linked from the document
+	mux.HandleFunc("GET /static/", s.handleStatic)         // the embedded bundle
 
 	return s.checkRequest(mux)
 }
 
 // checkRequest rejects requests addressed to a Host other than the daemon's
-// own, and any browser request to the control plane, including one from the
-// daemon's own origin.
+// own, any browser request to the control plane, including one from the
+// daemon's own origin, and any request another site makes the browser send.
 func (s *Server) checkRequest(next http.Handler) http.Handler {
 	allowedHosts := map[string]bool{
 		fmt.Sprintf("127.0.0.1:%d", s.port): true,
@@ -56,14 +58,21 @@ func (s *Server) checkRequest(next http.Handler) http.Handler {
 			return
 		}
 		// Close the control plane to browsers, our own origin included,
-		// because a script running there (e.g. a local HTML file opened as an
-		// asset) could otherwise open and read any file the user can. The CLI
-		// sends neither header. Check Sec-Fetch-Site too because browsers may
-		// omit Origin on same-origin GETs, while current ones send
-		// Sec-Fetch-Site on every request.
+		// because a script running there (e.g. a local HTML file linked from
+		// a document) could otherwise open and read any file the user can.
+		// The CLI sends neither header. Check Sec-Fetch-Site too because
+		// browsers may omit Origin on same-origin GETs, while current ones
+		// send Sec-Fetch-Site on every request.
 		if strings.HasPrefix(r.URL.Path, "/api/") &&
 			(r.Header.Get("Origin") != "" || r.Header.Get("Sec-Fetch-Site") != "") {
 			writeError(w, http.StatusForbidden, "the control plane does not accept browser requests")
+			return
+		}
+		// Refuse whatever another site makes the browser request.
+		// mop is purely a local preview tool.
+		switch r.Header.Get("Sec-Fetch-Site") {
+		case "cross-site", "same-site":
+			writeError(w, http.StatusForbidden, "requests from other sites are refused")
 			return
 		}
 		next.ServeHTTP(w, r)
@@ -88,8 +97,9 @@ func decode(w http.ResponseWriter, r *http.Request, out any) bool {
 	return true
 }
 
-// validPath rejects anything that is not an absolute path. Resolving symlinks
-// is the CLI's job; the daemon takes the path it is given as the identity.
+// validPath rejects anything that is not an absolute path. A path on the control
+// plane has its symlinks resolved by the CLI, so the daemon takes it as the
+// identity as it is.
 func validPath(w http.ResponseWriter, path string) bool {
 	if path == "" || !filepath.IsAbs(path) {
 		writeError(w, http.StatusBadRequest, "path must be an absolute path")
@@ -286,45 +296,57 @@ func writeEvent(w http.ResponseWriter, f http.Flusher, ev event) {
 	f.Flush()
 }
 
-// handleAsset serves local files (images and such) relative to the
-// document's base directory only. The daemon's own cwd is unrelated to the
-// document, so relative paths must always resolve against that base.
-func (s *Server) handleAsset(w http.ResponseWriter, r *http.Request) {
+// handleFile resolves a relative link found in a document. A Markdown target is
+// registered and the browser is redirected to its preview; anything else is
+// served as a file. The path comes in the query because browsers collapse ".."
+// in a URL path, percent-encoded or not.
+func (s *Server) handleFile(w http.ResponseWriter, r *http.Request) {
 	d, ok := s.getDocByID(r.PathValue("id"))
 	if !ok {
 		http.NotFound(w, r)
 		return
 	}
-	rel := r.PathValue("path")
-	target := filepath.Join(d.baseDir, filepath.FromSlash(rel))
+	rel := r.URL.Query().Get("path")
+	if rel == "" || filepath.IsAbs(rel) {
+		writeError(w, http.StatusBadRequest, "path must be a relative path")
+		return
+	}
+	// Resolved exactly like a path given to the CLI, so that a document
+	// reached through a symlink keeps the identity it has there.
+	target, err := docpath.Resolve(filepath.Join(d.baseDir, filepath.FromSlash(rel)))
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	// Refuse files outside the serving root, worked out on every request
+	// rather than kept from when the document was opened. That follows a
+	// repository created afterwards, and a few stats cost nothing next to
+	// serving the file.
+	if !contains(servingRoot(d.baseDir), target) {
+		writeError(w, http.StatusForbidden, "file is outside the document's repository")
+		return
+	}
+	info, err := os.Stat(target)
+	if err != nil || info.IsDir() {
+		http.NotFound(w, r)
+		return
+	}
 
-	// Reject anything that escapes the base directory, symlinks included.
-	base, err := filepath.EvalSymlinks(d.baseDir)
-	if err != nil {
-		http.NotFound(w, r)
+	if docpath.IsDocument(target) {
+		linked, err := s.openDoc(target)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		s.log.Info("document opened from a link", "path", linked.path)
+		// Relative, unlike docURL: a tab on localhost must not be moved to
+		// 127.0.0.1, where it would be a different origin and its links
+		// would count as same-site.
+		http.Redirect(w, r, "/doc/"+linked.id, http.StatusSeeOther)
 		return
 	}
-	resolved, err := filepath.EvalSymlinks(target)
-	if err != nil {
-		http.NotFound(w, r)
-		return
-	}
-	if resolved != base && !strings.HasPrefix(resolved, base+string(filepath.Separator)) {
-		writeError(w, http.StatusForbidden, "asset is outside the document directory")
-		return
-	}
-	// Sandbox the asset because it comes from whatever repository the user is
-	// previewing, yet is served on the daemon's origin. Browsers ignore CSP on
-	// subresources, so <img> in the preview is unaffected.
-	w.Header().Set("Content-Security-Policy", "sandbox")
-	// Disable sniffing so the browser cannot reinterpret a file as a type the
-	// sandbox was not expected to cover.
-	w.Header().Set("X-Content-Type-Options", "nosniff")
-	// Revalidate rather than serve from cache: an image edited next to the
-	// document has to show up in the preview. ServeFile still answers 304
-	// while the file is unchanged.
-	w.Header().Set("Cache-Control", "no-cache")
-	http.ServeFile(w, r, resolved)
+
+	serveFile(w, r, target)
 }
 
 func (s *Server) handleStatic(w http.ResponseWriter, r *http.Request) {

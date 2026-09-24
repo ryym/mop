@@ -11,9 +11,9 @@ import (
 	"io"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"runtime"
 
+	"github.com/ryym/mop/internal/docpath"
 	"github.com/ryym/mop/internal/version"
 )
 
@@ -77,25 +77,6 @@ func Run(args []string) int {
 	return 0
 }
 
-// resolvePath makes a path absolute and resolves symlinks, which is what
-// gives a document its identity. The daemon trusts whatever it receives.
-func resolvePath(path string) (string, error) {
-	abs, err := filepath.Abs(path)
-	if err != nil {
-		return "", err
-	}
-	resolved, err := filepath.EvalSymlinks(abs)
-	if err != nil {
-		// The file may be gone (e.g. `mop close` after a delete). The
-		// absolute path is still a usable identifier for the daemon.
-		if errors.Is(err, os.ErrNotExist) {
-			return abs, nil
-		}
-		return "", err
-	}
-	return resolved, nil
-}
-
 // parseFileArgs parses flags that may appear after the file argument, which
 // is how the CLI spec writes them (`mop scroll <file> --line N`). Go's flag
 // package stops at the first positional argument, so parsing is resumed after
@@ -119,7 +100,7 @@ func parseFileArgs(fs *flag.FlagSet, args []string) (string, error) {
 	if file == "" {
 		return "", errors.New("a file argument is required")
 	}
-	return resolvePath(file)
+	return docpath.Resolve(file)
 }
 
 func readStdin() (string, error) {

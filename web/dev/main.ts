@@ -12,8 +12,8 @@ import sample from "./sample.md" with { type: "text" };
 const container = document.getElementById("mop-content") as HTMLElement;
 const highlighter = await createHighlighter();
 
-// The asset base is unused: sample.md keeps its images self contained, since
-// there is no daemon here to serve files next to the document.
+// The file endpoint is unused: sample.md has no relative links or images, since
+// there is no daemon here to serve the files they would point at.
 const md = createMarkdown(highlighter, "");
 
 // Shiki grammars are loaded lazily, so the ones sample.md needs have to be in

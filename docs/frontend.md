@@ -45,6 +45,14 @@ Block elements carry the source line they start at, in a `data-source-line`
 attribute. This is the only link between editor positions and the rendered page,
 and it is what scroll synchronisation reads.
 
+## Relative links
+
+Relative URLs in links and images are rewritten to the daemon's file endpoint
+while rendering; see [architecture.md](./architecture.md#links-between-files).
+Doing it at render time rather than on the DOM matters because of patching: a
+rewrite applied after a patch would be undone by the next one, reloading
+images on every update.
+
 ## Updating the DOM
 
 Rendered HTML is applied as a **patch, never as a replacement**. Replacing the

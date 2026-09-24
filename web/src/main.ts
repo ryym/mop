@@ -42,7 +42,7 @@ async function main(): Promise<void> {
   // The highlighter is built once, before the first render, so every render
   // afterwards is a synchronous call and the page never repaints in stages.
   const highlighter = await createHighlighter();
-  const md = createMarkdown(highlighter, `/doc/${docId}/asset/`);
+  const md = createMarkdown(highlighter, `/doc/${docId}/file`);
 
   const render = async (content: string) => {
     // Shiki grammars are loaded lazily, so whatever the fences and
