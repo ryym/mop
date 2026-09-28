@@ -361,6 +361,8 @@ func (s *Server) handleStatic(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/javascript; charset=utf-8")
 	case ".css":
 		w.Header().Set("Content-Type", "text/css; charset=utf-8")
+	case ".svg":
+		w.Header().Set("Content-Type", "image/svg+xml")
 	}
 	// The asset URLs never change, so a cached bundle would survive a daemon
 	// that was restarted precisely to pick up a new one. Revalidating on
