@@ -24,11 +24,10 @@ body {
   border-bottom: 1px solid var(--borderColor-muted);
 }
 
-/* The trailing padding keeps the last lines reachable by scroll sync. */
 #mop-content {
   max-width: 980px;
   margin: 0 auto;
-  padding: 1rem 1.5rem 60vh;
+  padding: 1rem 1.5rem 4rem;
 }
 
 #mop-content > *:first-child {
