@@ -5,6 +5,7 @@
 // needs; DOMPurify's default allowlist is not used, as it lets through forms
 // and buttons.
 import DOMPurify, { type Config, type WindowLike } from "dompurify";
+import { toFileUrl } from "./fileurl";
 
 const ALLOWED_TAGS = [
   // Headings, paragraphs and text.
@@ -69,10 +70,10 @@ const CONFIG: Config & { RETURN_DOM_FRAGMENT: true } = {
 export type Sanitizer = (html: string) => DocumentFragment;
 
 /**
- * Creates a sanitizer bound to `window`. Tests pass a jsdom window; the page
- * uses its own.
+ * Creates a sanitizer bound to `window`, pointing relative URLs at
+ * `fileEndpoint`. Tests pass a jsdom window; the page uses its own.
  */
-export function createSanitizer(window: WindowLike): Sanitizer {
+export function createSanitizer(window: WindowLike, fileEndpoint: string): Sanitizer {
   const purify = DOMPurify(window);
 
   purify.addHook("uponSanitizeAttribute", (node, data) => {
@@ -96,8 +97,33 @@ export function createSanitizer(window: WindowLike): Sanitizer {
     // Markdown can render, through the "- [x]" task list syntax.
     if (node.nodeName === "INPUT" && node.getAttribute("type") !== "checkbox") {
       node.remove();
+      return;
     }
+    // Point relative URLs written in raw HTML at the file endpoint. Markdown
+    // links and images have been rewritten by markdown.ts already, and no
+    // longer look relative.
+    for (const attr of ["href", "src"]) {
+      const url = node.getAttribute(attr);
+      const rewritten = url === null ? null : toFileUrl(url, fileEndpoint);
+      if (rewritten !== null) node.setAttribute(attr, rewritten);
+    }
+    const srcset = node.getAttribute("srcset");
+    if (srcset !== null) node.setAttribute("srcset", rewriteSrcset(srcset, fileEndpoint));
   });
 
   return (html) => purify.sanitize(html, CONFIG);
+}
+
+// rewriteSrcset rewrites each URL in a srcset, a comma separated list of a URL
+// followed by an optional width or density descriptor. A URL containing a
+// comma is not told apart from the separator; such names are rare enough.
+function rewriteSrcset(srcset: string, fileEndpoint: string): string {
+  return srcset
+    .split(",")
+    .map((candidate) => {
+      const [url = "", ...descriptor] = candidate.trim().split(/\s+/);
+      const rewritten = toFileUrl(url, fileEndpoint) ?? url;
+      return [rewritten, ...descriptor].join(" ");
+    })
+    .join(", ");
 }

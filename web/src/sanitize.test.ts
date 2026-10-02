@@ -6,7 +6,7 @@ import { collectLanguages, createMarkdown } from "./markdown";
 import { createSanitizer } from "./sanitize";
 
 const { window } = new JSDOM("");
-const sanitizer = createSanitizer(window as unknown as WindowLike);
+const sanitizer = createSanitizer(window as unknown as WindowLike, "/doc/abc123/file");
 
 function sanitize(html: string): string {
   const div = window.document.createElement("div");
@@ -96,13 +96,13 @@ test("ids that could collide with the page's own elements are dropped", () => {
 });
 
 test("names that clobber document properties are dropped", () => {
-  expect(sanitize('<img name="cookie" src="x.png">')).toBe('<img src="x.png">');
+  expect(sanitize('<img name="cookie" src="/x.png">')).toBe('<img src="/x.png">');
 });
 
 test("HTML that READMEs commonly use is kept", () => {
   const samples = [
-    '<p align="center"><img src="logo.png" width="200" alt="logo"></p>',
-    '<picture><source media="(prefers-color-scheme: dark)" srcset="dark.png"><img src="light.png"></picture>',
+    '<p align="center"><img src="/logo.png" width="200" alt="logo"></p>',
+    '<picture><source media="(prefers-color-scheme: dark)" srcset="/dark.png"><img src="/light.png"></picture>',
     "<details open><summary>More</summary><p>x</p></details>",
     "<kbd>Ctrl</kbd> H<sub>2</sub>O x<sup>2</sup>",
     '<a href="mailto:a@example.com">a</a> <a href="https://example.com/">b</a>',
@@ -111,4 +111,28 @@ test("HTML that READMEs commonly use is kept", () => {
   for (const html of samples) {
     expect(sanitize(html)).toBe(normalize(html));
   }
+});
+
+test("relative URLs in raw HTML point at the document's file endpoint", () => {
+  expect(sanitize('<a href="../README.md#usage">a</a>')).toBe(
+    '<a href="/doc/abc123/file?path=..%2FREADME.md#usage">a</a>',
+  );
+  expect(sanitize('<img src="./logo.png">')).toBe('<img src="/doc/abc123/file?path=.%2Flogo.png">');
+  expect(sanitize('<img src="my%20logo.png">')).toBe(
+    '<img src="/doc/abc123/file?path=my%20logo.png">',
+  );
+});
+
+test("each URL in a srcset is rewritten, keeping its descriptor", () => {
+  expect(sanitize('<picture><source srcset="dark.png 1x, dark@2x.png 2x"></picture>')).toBe(
+    '<picture><source srcset="/doc/abc123/file?path=dark.png 1x, /doc/abc123/file?path=dark%402x.png 2x"></picture>',
+  );
+  expect(sanitize('<img srcset="https://example.com/a.png 100w, b.png">')).toBe(
+    '<img srcset="https://example.com/a.png 100w, /doc/abc123/file?path=b.png">',
+  );
+});
+
+test("absolute URLs, root paths and fragments in raw HTML are left alone", () => {
+  const html = '<a href="https://example.com/">a</a><a href="#sec">b</a><img src="/x.png">';
+  expect(sanitize(html)).toBe(html);
 });

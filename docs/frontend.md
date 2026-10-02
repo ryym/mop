@@ -63,9 +63,10 @@ and it is what scroll synchronisation reads.
 
 Relative URLs in links and images are rewritten to the daemon's file endpoint
 while rendering; see [architecture.md](./architecture.md#links-between-files).
-Doing it at render time rather than on the DOM matters because of patching: a
-rewrite applied after a patch would be undone by the next one, reloading
-images on every update.
+Markdown links and images are rewritten by markdown-it's renderer; `href`,
+`src` and `srcset` written in raw HTML are rewritten by the sanitizer. Doing it
+before patching rather than on the DOM matters: a rewrite applied after a patch
+would be undone by the next one, reloading images on every update.
 
 ## Updating the DOM
 

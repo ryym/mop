@@ -21,5 +21,5 @@ const md = createMarkdown(highlighter, "");
 // before the synchronous md.render() below.
 await highlighter.loadLanguages(collectLanguages(md, sample));
 
-container.replaceChildren(createSanitizer(window)(md.render(sample)));
+container.replaceChildren(createSanitizer(window, "")(md.render(sample)));
 void drawDiagrams(container);
