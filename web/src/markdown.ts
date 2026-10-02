@@ -53,10 +53,9 @@ export function collectLanguages(md: MarkdownIt, content: string): string[] {
 
 export function createMarkdown(highlighter: Highlighter, fileEndpoint: string): MarkdownIt {
   const md = new MarkdownIt({
-    // Raw HTML in the source is never turned into HTML, and that is what makes
-    // a separate sanitizer unnecessary. Changing this flag is a change of the
-    // sanitizing policy itself, not a rendering tweak.
-    html: false,
+    // Raw HTML in the source is rendered as HTML. The output is sanitized
+    // before it reaches the page; see sanitize.ts.
+    html: true,
     linkify: true,
     typographer: false,
     highlight(code, info) {

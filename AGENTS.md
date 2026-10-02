@@ -15,8 +15,10 @@ explicitly if you intend to.
 
 - **The daemon does not parse Markdown.** Markdown-aware code belongs in
   `web/src/` only. Go code stores, watches and forwards text.
-- **markdown-it runs with `html: false`.** It is the entire sanitizing policy,
-  and `patch.ts` writes rendered HTML with `innerHTML` on that basis.
+- **Everything rendered is sanitized before it reaches the DOM.** markdown-it
+  renders raw HTML, and the allowlist in `sanitize.ts` is the sanitizing
+  policy; the preview page's CSP is only the fallback. Widening the allowlist
+  is a change of that policy, not a rendering tweak.
 - **Line numbers are 1-based** everywhere outside markdown-it's `token.map`.
 - **The DOM is patched, never replaced**.
 

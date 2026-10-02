@@ -19,7 +19,12 @@ function anchors(container: HTMLElement): Anchor[] {
   const found: Anchor[] = [];
   for (const el of container.querySelectorAll<HTMLElement>("[data-source-line]")) {
     const line = Number.parseInt(el.dataset.sourceLine ?? "", 10);
-    if (Number.isFinite(line)) {
+    // Skip elements that are not visible, such as those inside a closed
+    // <details>, because their position is not where they appear; their lines
+    // are interpolated between the anchors around them instead. Check with
+    // checkVisibility() because a closed <details> hides its content with
+    // content-visibility, which still leaves it a box with a position.
+    if (Number.isFinite(line) && el.checkVisibility()) {
       found.push({ line, top: el.getBoundingClientRect().top + window.scrollY });
     }
   }

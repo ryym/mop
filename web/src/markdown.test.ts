@@ -21,10 +21,10 @@ test("table column alignment is an align attribute, not a style", () => {
   expect(html).not.toContain("style=");
 });
 
-test("raw HTML in the source is not turned into HTML", () => {
-  const html = md.render("<script>alert(1)</script>\n");
-  expect(html).not.toContain("<script>");
-  expect(html).toContain("&lt;script&gt;");
+test("raw HTML in the source is passed through for the sanitizer", () => {
+  const html = md.render('<p align="center">\n\n**x**\n\n</p>\n');
+  expect(html).toContain('<p align="center">');
+  expect(html).toContain('<p data-source-line="3"><strong>x</strong></p>');
 });
 
 test("a loaded language is highlighted, an unknown one is not", () => {

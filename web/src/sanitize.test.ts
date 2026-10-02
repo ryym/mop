@@ -38,6 +38,21 @@ test("mop's own output passes through unchanged", async () => {
   expect(sanitize(html)).toBe(normalize(html));
 });
 
+test("raw HTML in a document is rendered within the allowlist", async () => {
+  const highlighter = await createHighlighter();
+  const md = createMarkdown(highlighter, "/doc/abc123/file");
+  const html = sanitize(
+    md.render(
+      '<details>\n<summary>More</summary>\n\nInside <kbd>Ctrl</kbd>\n\n</details>\n\n<img src="logo.png" onerror="alert(1)">\n<script>alert(1)</script>\n',
+    ),
+  );
+  expect(html).toContain("<details>\n<summary>More</summary>");
+  expect(html).toContain('<p data-source-line="4">Inside <kbd>Ctrl</kbd></p>');
+  expect(html).toContain('<img src="/doc/abc123/file?path=logo.png">');
+  expect(html).not.toContain("onerror");
+  expect(html).not.toContain("script");
+});
+
 test("scripts and anything that runs them are removed", () => {
   const payloads = [
     "<script>alert(1)</script>",

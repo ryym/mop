@@ -10,21 +10,29 @@ highlighting, updating the DOM, deciding where to scroll, and drawing anything
 that only a browser can draw. Each file in `web/src/` states its own role at the
 top; those comments are the reference for what lives where.
 
-Everything the page needs is served from the binary; it makes no external
-requests. The initial Markdown is embedded in the page itself, so the first
-render does not wait for the event stream. Without JavaScript nothing is
-displayed at all, which is acceptable for a local tool.
+Everything the page needs is served from the binary; the only external
+requests are for images the document itself points at. The initial Markdown is
+embedded in the page itself, so the first render does not wait for the event
+stream. Without JavaScript nothing is displayed at all, which is acceptable
+for a local tool.
 
 ## Sanitizing
 
-markdown-it runs with **`html: false`**, so raw HTML in the source is never
-turned into markup. **Changing it is a change of the sanitizing policy, not a
-rendering tweak.**
+Raw HTML in the source is rendered, roughly to the extent GitHub renders it.
+Documents may come from untrusted repositories, and a script running on the
+page could read every file the daemon serves for them, so everything
+markdown-it renders is sanitized with DOMPurify before it reaches the DOM
+(`sanitize.ts`). The page's CSP (see
+[architecture.md](./architecture.md#security)) is the fallback for anything
+that gets past it.
 
-On top of that, everything markdown-it renders is sanitized with DOMPurify
-before it reaches the DOM (`sanitize.ts`). The allowlist of tags and
-attributes follows what GitHub renders, plus what mop's own output needs.
+The allowlist of tags and attributes follows what GitHub renders, plus what
+mop's own output needs. **Widening it is a change of the sanitizing policy, not
+a rendering tweak.**
 
+- **`svg` and `math` are not allowed**, as on GitHub; they are the usual ground
+  for mutation XSS. Mermaid diagrams are drawn after sanitizing and are not
+  affected.
 - **`style` is allowed only inside highlighted code.** shiki has no other way
   to colour it. This is also why table alignment is rendered as an `align`
   attribute.
@@ -32,6 +40,10 @@ attributes follows what GitHub renders, plus what mop's own output needs.
   `data:` on `<img src>`.
 - **The result is a DOM fragment** parsed in DOMPurify's inert document, so
   nothing in it runs or loads before it is sanitized.
+
+An HTML block cannot carry a source line, so scroll synchronisation
+interpolates across it. While a tag such as `<details>` is being typed without
+its closing tag, the rest of the document renders inside it.
 
 mop's own output must pass through the sanitizer unchanged; a test holds
 `web/dev/sample.md` to that. A construct added to the renderer that the

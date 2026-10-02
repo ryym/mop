@@ -145,8 +145,9 @@ it does not treat localhost as trusted:
   which stops inline event handlers and `javascript:` URLs. Inline styles are
   allowed, as shiki and mermaid emit them, and so are images from anywhere.
   Requests leaving the page carry no referrer.
-- **Sanitizing rests entirely on the Markdown renderer never emitting raw HTML**
-  — see [frontend.md](./frontend.md).
+- **Rendered HTML is sanitized in the browser** before it reaches the DOM — see
+  [frontend.md](./frontend.md#sanitizing). The CSP above is the fallback for
+  anything that gets past the sanitizer.
 
 ## Build
 
