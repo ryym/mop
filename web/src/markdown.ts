@@ -77,9 +77,30 @@ export function createMarkdown(highlighter: Highlighter, fileEndpoint: string): 
 
   md.use(taskLists, { label: true });
   addSourceLines(md);
+  alignTableCells(md);
   addFileLinks(md, fileEndpoint);
   addFrontmatter(md, highlighter);
   return md;
+}
+
+// alignTableCells renders a column's alignment as an align attribute instead
+// of markdown-it's inline style. Inline styles in the rendered HTML are kept
+// to highlighted code, which cannot do without them.
+function alignTableCells(md: MarkdownIt): void {
+  for (const rule of ["th_open", "td_open"]) {
+    const original =
+      md.renderer.rules[rule] ??
+      ((tokens, idx, options, _env, self) => self.renderToken(tokens, idx, options));
+    md.renderer.rules[rule] = (tokens, idx, options, env, self) => {
+      const token = tokens[idx]!;
+      const align = /^text-align:(left|center|right)$/.exec(token.attrGet("style") ?? "")?.[1];
+      if (align) {
+        token.attrs = token.attrs?.filter(([name]) => name !== "style") ?? null;
+        token.attrSet("align", align);
+      }
+      return original(tokens, idx, options, env, self);
+    };
+  }
 }
 
 // addFileLinks points relative links and image sources at the daemon's file

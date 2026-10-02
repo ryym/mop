@@ -13,6 +13,14 @@ test("block elements carry 1 based source lines", () => {
   expect(html).toContain('<li data-source-line="5">');
 });
 
+test("table column alignment is an align attribute, not a style", () => {
+  const html = md.render("| a | b | c |\n|:--|:-:|---|\n| 1 | 2 | 3 |\n");
+  expect(html).toContain('<th align="left">a</th>');
+  expect(html).toContain('<td align="center">2</td>');
+  expect(html).toContain("<td>3</td>");
+  expect(html).not.toContain("style=");
+});
+
 test("raw HTML in the source is not turned into HTML", () => {
   const html = md.render("<script>alert(1)</script>\n");
   expect(html).not.toContain("<script>");
