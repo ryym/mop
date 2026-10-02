@@ -217,6 +217,24 @@ func (s *Server) handleStatus(w http.ResponseWriter, _ *http.Request) {
 	})
 }
 
+// pageCSP is the preview page's Content-Security-Policy. The page renders
+// content from whatever repository is being previewed, and a script running on
+// the daemon's origin could read the files it serves. Sanitizing is the
+// frontend's job; this stops scripts that get past it.
+//
+// Inline styles are allowed because shiki and mermaid emit them. Images may
+// come from anywhere, as they can in any Markdown viewer; without scripts an
+// image request carries nothing but its own URL.
+const pageCSP = "default-src 'self'; " +
+	"script-src 'self'; " +
+	"style-src 'self' 'unsafe-inline'; " +
+	"img-src 'self' http: https: data:; " +
+	"connect-src 'self'; " +
+	"frame-src 'none'; " +
+	"object-src 'none'; " +
+	"base-uri 'none'; " +
+	"form-action 'none'"
+
 func (s *Server) handlePage(w http.ResponseWriter, r *http.Request) {
 	d, ok := s.getDocByID(r.PathValue("id"))
 	if !ok {
@@ -231,6 +249,8 @@ func (s *Server) handlePage(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("Content-Security-Policy", pageCSP)
+	w.Header().Set("Referrer-Policy", "no-referrer")
 	err = s.page.Execute(w, map[string]any{
 		"Title":   d.title(),
 		"Path":    d.displayPath(),

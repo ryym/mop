@@ -152,6 +152,29 @@ func TestPageEmbedsRawMarkdown(t *testing.T) {
 	}
 }
 
+func TestPageRestrictsScripts(t *testing.T) {
+	c, port := startDaemon(t)
+	path := writeDoc(t, "# Hello\n")
+	if _, err := c.Open(path); err != nil {
+		t.Fatal(err)
+	}
+
+	res, err := http.Get(fmt.Sprintf("http://127.0.0.1:%d/doc/%s", port, docID(path)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer res.Body.Close()
+	csp := res.Header.Get("Content-Security-Policy")
+	for _, want := range []string{"script-src 'self';", "connect-src 'self';", "base-uri 'none';"} {
+		if !strings.Contains(csp, want) {
+			t.Errorf("Content-Security-Policy = %q, want it to contain %q", csp, want)
+		}
+	}
+	if got := res.Header.Get("Referrer-Policy"); got != "no-referrer" {
+		t.Errorf("Referrer-Policy = %q, want no-referrer", got)
+	}
+}
+
 func TestRejectsForeignHost(t *testing.T) {
 	c, port := startDaemon(t)
 	_ = c
