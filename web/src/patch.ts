@@ -6,13 +6,12 @@
 // applies it as a patch instead.
 import morphdom from "morphdom";
 
-export function patch(container: HTMLElement, html: string): void {
-  // morphdom compares two elements, so the new HTML gets its own container of
-  // the same shape. Assigning innerHTML here is safe because the string comes
-  // from markdown-it with html: false (see markdown.ts).
+export function patch(container: HTMLElement, content: DocumentFragment): void {
+  // morphdom compares two elements, so the new content gets its own container
+  // of the same shape. The fragment is sanitized already (see sanitize.ts).
   const next = document.createElement(container.tagName);
   next.id = container.id;
-  next.innerHTML = html;
+  next.append(content);
 
   morphdom(container, next, {
     onBeforeElUpdated(fromEl, toEl) {

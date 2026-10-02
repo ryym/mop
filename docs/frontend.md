@@ -18,10 +18,24 @@ displayed at all, which is acceptable for a local tool.
 ## Sanitizing
 
 markdown-it runs with **`html: false`**, so raw HTML in the source is never
-turned into markup. That flag is the entire sanitizing policy — no DOMPurify, no
-allowlist — and the rendered HTML is written into the DOM on that basis.
+turned into markup. **Changing it is a change of the sanitizing policy, not a
+rendering tweak.**
 
-**Changing it is a change of the sanitizing policy, not a rendering tweak.**
+On top of that, everything markdown-it renders is sanitized with DOMPurify
+before it reaches the DOM (`sanitize.ts`). The allowlist of tags and
+attributes follows what GitHub renders, plus what mop's own output needs.
+
+- **`style` is allowed only inside highlighted code.** shiki has no other way
+  to colour it. This is also why table alignment is rendered as an `align`
+  attribute.
+- **URLs are limited to `http:`, `https:`, `mailto:` and relative ones**, plus
+  `data:` on `<img src>`.
+- **The result is a DOM fragment** parsed in DOMPurify's inert document, so
+  nothing in it runs or loads before it is sanitized.
+
+mop's own output must pass through the sanitizer unchanged; a test holds
+`web/dev/sample.md` to that. A construct added to the renderer that the
+allowlist does not cover is silently stripped, so it fails there first.
 
 ## Highlighting
 
