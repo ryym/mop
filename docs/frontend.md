@@ -74,6 +74,9 @@ Rendered HTML is applied as a **patch, never as a replacement**. Replacing the
 tree would reset the scroll position, reload images, drop `<details>` state and
 text selection, and wipe drawn diagrams.
 
+A `<details>` keeps the state the reader left it in across patches. Only a
+change to its `open` attribute in the source opens or closes it.
+
 ## Scrolling
 
 The daemon sends a source line; only the page knows what that is in pixels. The

@@ -36,8 +36,9 @@ explicitly if you intend to.
   bypass the CLI, restart it yourself.
 - **`go build` alone produces a broken binary** unless the bundle exists. `make`
   checks for it, and so does the daemon on startup.
-- **Browser behaviour has no automated coverage.** DOM patching, scroll
-  interpolation and diagram redrawing are verified by hand. Change them
+- **Browser behaviour has little automated coverage.** Apart from a jsdom test
+  of `<details>` state, DOM patching, scroll interpolation and diagram
+  redrawing are verified by hand. Change them
   carefully, and check the result in a real preview.
 
 ## Documentation
