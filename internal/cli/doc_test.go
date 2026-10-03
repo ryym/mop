@@ -43,7 +43,7 @@ func TestNoDaemonExitsWithNoPreview(t *testing.T) {
 }
 
 func TestAsNoPreview(t *testing.T) {
-	notFound := fmt.Errorf("%w: %s", client.ErrNotFound, "notes.md")
+	notFound := fmt.Errorf("scroll: %w", &client.NotFoundError{Message: "document is not open: notes.md"})
 	other := errors.New("boom")
 	for _, tc := range []struct {
 		err  error

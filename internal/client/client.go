@@ -13,8 +13,11 @@ import (
 	"github.com/ryym/mop/internal/api"
 )
 
-// ErrNotFound is returned when the daemon does not know the given document.
-var ErrNotFound = errors.New("document is not open")
+// NotFoundError is returned when the daemon does not know the given document.
+// Its message is the daemon's own.
+type NotFoundError struct{ Message string }
+
+func (e *NotFoundError) Error() string { return e.Message }
 
 type Client struct {
 	port int
@@ -98,7 +101,7 @@ func (c *Client) do(method, path string, body any, out any) error {
 			msg = res.Status
 		}
 		if res.StatusCode == http.StatusNotFound {
-			return fmt.Errorf("%w: %s", ErrNotFound, msg)
+			return &NotFoundError{Message: msg}
 		}
 		return errors.New(msg)
 	}

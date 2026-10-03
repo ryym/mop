@@ -40,7 +40,7 @@ func (e *noPreviewError) Error() string { return e.err.Error() }
 func (e *noPreviewError) Unwrap() error { return e.err }
 
 func asNoPreview(err error) error {
-	if errors.Is(err, errNoDaemon) || errors.Is(err, client.ErrNotFound) {
+	if _, ok := errors.AsType[*client.NotFoundError](err); ok || errors.Is(err, errNoDaemon) {
 		return &noPreviewError{err}
 	}
 	return err
