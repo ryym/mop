@@ -32,6 +32,20 @@ func connectExisting() (*client.Client, error) {
 	return state.Connect()
 }
 
+// noPreviewError marks a failure caused by the document having no preview:
+// no daemon is running, or the running one does not hold it.
+type noPreviewError struct{ err error }
+
+func (e *noPreviewError) Error() string { return e.err.Error() }
+func (e *noPreviewError) Unwrap() error { return e.err }
+
+func asNoPreview(err error) error {
+	if errors.Is(err, errNoDaemon) || errors.Is(err, client.ErrNotFound) {
+		return &noPreviewError{err}
+	}
+	return err
+}
+
 // positionFlags are the --line / --viewport-ratio pair shared by update and
 // scroll. linePtr and ratioPtr report an omitted flag as nil, which is how the
 // control API distinguishes it from a given value.
@@ -106,14 +120,14 @@ func runUpdate(args []string) error {
 	}
 	c, err := connectExisting()
 	if err != nil {
-		return err
+		return asNoPreview(err)
 	}
-	return c.Update(api.UpdateRequest{
+	return asNoPreview(c.Update(api.UpdateRequest{
 		Path:          path,
 		Content:       content,
 		Line:          pos.linePtr(),
 		ViewportRatio: pos.ratioPtr(),
-	})
+	}))
 }
 
 func runScroll(args []string) error {
@@ -128,13 +142,13 @@ func runScroll(args []string) error {
 	}
 	c, err := connectExisting()
 	if err != nil {
-		return err
+		return asNoPreview(err)
 	}
-	return c.Scroll(api.ScrollRequest{
+	return asNoPreview(c.Scroll(api.ScrollRequest{
 		Path:          path,
 		Line:          pos.line,
 		ViewportRatio: pos.ratioPtr(),
-	})
+	}))
 }
 
 func runClose(args []string) error {
@@ -144,13 +158,10 @@ func runClose(args []string) error {
 		return err
 	}
 	c, err := connectExisting()
-	if errors.Is(err, errNoDaemon) {
-		return nil // Nothing is open, so there is nothing to close.
-	}
 	if err != nil {
-		return err
+		return asNoPreview(err)
 	}
-	return c.CloseDoc(path)
+	return asNoPreview(c.CloseDoc(path))
 }
 
 func runList(args []string) error {

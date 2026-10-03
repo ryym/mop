@@ -47,6 +47,10 @@ mop close README.md
 
 Only Markdown files (`.md`, `.markdown`) can be opened.
 
+`update`, `scroll` and `close` exit with status 3 when the document has no
+preview, for example after the daemon has shut itself down. Editor integrations
+use this to end their session instead of reporting an error.
+
 Ports and URLs never need to be typed. The daemon shuts itself down after ten
 minutes with no browser connected, and it can also be managed explicitly:
 

@@ -33,7 +33,16 @@ Options:
   --viewport-ratio R    Where to place that line: 0.0 top, 1.0 bottom (default 0.5)
   --help                Show this help
   --version             Show the version
+
+Exit status:
+  0  Success
+  3  update, scroll, close: the document has no preview
+  Any other non-zero status is an error.
 `
+
+// exitNoPreview is part of the CLI's interface: callers rely on it to tell a
+// preview that has ended apart from a failure.
+const exitNoPreview = 3
 
 // Run dispatches a subcommand and returns the process exit code.
 func Run(args []string) int {
@@ -72,6 +81,10 @@ func Run(args []string) int {
 
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "mop: "+err.Error())
+		var np *noPreviewError
+		if errors.As(err, &np) {
+			return exitNoPreview
+		}
 		return 1
 	}
 	return 0
