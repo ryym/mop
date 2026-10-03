@@ -140,8 +140,14 @@ it does not treat localhost as trusted:
   previewed, so an HTML or SVG file opened as a page must not run scripts on
   the daemon's origin. File responses carry `Content-Security-Policy: sandbox`
   and `nosniff`; images in the preview are unaffected.
-- **Sanitizing rests entirely on the Markdown renderer never emitting raw HTML**
-  — see [frontend.md](./frontend.md).
+- **The preview page cannot run scripts it did not load from the daemon.** Its
+  `Content-Security-Policy` allows scripts and connections to `'self'` only,
+  which stops inline event handlers and `javascript:` URLs. Inline styles are
+  allowed, as shiki and mermaid emit them, and so are images from anywhere.
+  Requests leaving the page carry no referrer.
+- **Rendered HTML is sanitized in the browser** before it reaches the DOM — see
+  [frontend.md](./frontend.md#sanitizing). The CSP above is the fallback for
+  anything that gets past the sanitizer.
 
 ## Build
 

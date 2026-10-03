@@ -15,8 +15,10 @@ explicitly if you intend to.
 
 - **The daemon does not parse Markdown.** Markdown-aware code belongs in
   `web/src/` only. Go code stores, watches and forwards text.
-- **markdown-it runs with `html: false`.** It is the entire sanitizing policy,
-  and `patch.ts` writes rendered HTML with `innerHTML` on that basis.
+- **Everything rendered is sanitized before it reaches the DOM.** markdown-it
+  renders raw HTML, and the allowlist in `sanitize.ts` is the sanitizing
+  policy; the preview page's CSP is only the fallback. Widening the allowlist
+  is a change of that policy, not a rendering tweak.
 - **Line numbers are 1-based** everywhere outside markdown-it's `token.map`.
 - **The DOM is patched, never replaced**.
 
@@ -36,8 +38,9 @@ explicitly if you intend to.
   bypass the CLI, restart it yourself.
 - **`go build` alone produces a broken binary** unless the bundle exists. `make`
   checks for it, and so does the daemon on startup.
-- **Browser behaviour has no automated coverage.** DOM patching, scroll
-  interpolation and diagram redrawing are verified by hand. Change them
+- **Browser behaviour has little automated coverage.** Apart from a jsdom test
+  of `<details>` state, DOM patching, scroll interpolation and diagram
+  redrawing are verified by hand. Change them
   carefully, and check the result in a real preview.
 
 ## Documentation

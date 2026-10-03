@@ -104,6 +104,19 @@ flowchart LR
   this is not a diagram ]]]
 ```
 
+## Raw HTML
+
+<p align="center">A centred paragraph, as READMEs open with.</p>
+
+Press <kbd>Ctrl</kbd> + <kbd>C</kbd>. H<sub>2</sub>O and x<sup>2</sup>.
+
+<details>
+<summary>A collapsed section</summary>
+
+Markdown inside it, **still rendered**.
+
+</details>
+
 ## Rules
 
 Above the rule.

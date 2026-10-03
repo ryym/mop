@@ -4,6 +4,7 @@ import MarkdownIt from "markdown-it";
 import taskLists from "markdown-it-task-lists";
 import { addFrontmatter, FRONTMATTER_TOKEN_TYPE } from "./frontmatter";
 import type { Highlighter } from "./highlight";
+import { toFileUrl } from "./fileurl";
 import { escapeHtml } from "./html";
 
 // Block level tokens that get a data-source-line attribute. The frontend spec
@@ -52,10 +53,9 @@ export function collectLanguages(md: MarkdownIt, content: string): string[] {
 
 export function createMarkdown(highlighter: Highlighter, fileEndpoint: string): MarkdownIt {
   const md = new MarkdownIt({
-    // Raw HTML in the source is never turned into HTML, and that is what makes
-    // a separate sanitizer unnecessary. Changing this flag is a change of the
-    // sanitizing policy itself, not a rendering tweak.
-    html: false,
+    // Raw HTML in the source is rendered as HTML. The output is sanitized
+    // before it reaches the page; see sanitize.ts.
+    html: true,
     linkify: true,
     typographer: false,
     highlight(code, info) {
@@ -77,14 +77,35 @@ export function createMarkdown(highlighter: Highlighter, fileEndpoint: string): 
 
   md.use(taskLists, { label: true });
   addSourceLines(md);
+  alignTableCells(md);
   addFileLinks(md, fileEndpoint);
   addFrontmatter(md, highlighter);
   return md;
 }
 
+// alignTableCells renders a column's alignment as an align attribute instead
+// of markdown-it's inline style. Inline styles in the rendered HTML are kept
+// to highlighted code, which cannot do without them.
+function alignTableCells(md: MarkdownIt): void {
+  for (const rule of ["th_open", "td_open"]) {
+    const original =
+      md.renderer.rules[rule] ??
+      ((tokens, idx, options, _env, self) => self.renderToken(tokens, idx, options));
+    md.renderer.rules[rule] = (tokens, idx, options, env, self) => {
+      const token = tokens[idx]!;
+      const align = /^text-align:(left|center|right)$/.exec(token.attrGet("style") ?? "")?.[1];
+      if (align) {
+        token.attrs = token.attrs?.filter(([name]) => name !== "style") ?? null;
+        token.attrSet("align", align);
+      }
+      return original(tokens, idx, options, env, self);
+    };
+  }
+}
+
 // addFileLinks points relative links and image sources at the daemon's file
-// endpoint. The page lives at /doc/<id>, so a bare "img.png" would resolve to
-// the non-existent /doc/img.png instead of the file next to the document.
+// endpoint; see fileurl.ts. Ones written in raw HTML are handled by the
+// sanitizer.
 function addFileLinks(md: MarkdownIt, fileEndpoint: string): void {
   for (const [rule, attr] of [
     ["image", "src"],
@@ -101,38 +122,6 @@ function addFileLinks(md: MarkdownIt, fileEndpoint: string): void {
       return original(tokens, idx, options, env, self);
     };
   }
-}
-
-// toFileUrl returns the file endpoint URL for a relative URL, or null to leave
-// the URL as it is.
-function toFileUrl(url: string, fileEndpoint: string): string | null {
-  if (!isRelative(url)) return null;
-  // Split before decoding, so that an encoded "#" or "?" in a file name stays
-  // part of the path. The fragment is kept for the browser; the query means
-  // nothing to a local file and is dropped.
-  const hashAt = url.indexOf("#");
-  const fragment = hashAt < 0 ? "" : url.slice(hashAt);
-  const path = (hashAt < 0 ? url : url.slice(0, hashAt)).split("?")[0]!;
-  if (path === "") return null;
-  // markdown-it has already percent-encoded the URL, so it is decoded first
-  // to avoid encoding it twice. A malformed escape is left for the browser.
-  let decoded: string;
-  try {
-    decoded = decodeURIComponent(path);
-  } catch {
-    return null;
-  }
-  // The path goes in the query: browsers collapse ".." in a URL path, even
-  // percent-encoded, which would lose "../img.png".
-  return `${fileEndpoint}?path=${encodeURIComponent(decoded)}${fragment}`;
-}
-
-// isRelative reports whether url is a path relative to the document, as
-// opposed to an absolute path, an in-page anchor or an external URL.
-function isRelative(url: string): boolean {
-  if (url === "" || url.startsWith("/") || url.startsWith("#")) return false;
-  // Exclude anything with a scheme (http:, data:, file:) or protocol relative.
-  return !/^[a-z][a-z0-9+.-]*:/i.test(url) && !url.startsWith("//");
 }
 
 // addSourceLines wraps the renderer rules so block elements carry the source

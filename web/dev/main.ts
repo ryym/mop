@@ -1,12 +1,13 @@
 // Entry point of the style preview: renders sample.md once, with no daemon,
 // no event stream and no build step, so that mop.css can be edited and seen.
 //
-// The rendering pipeline is the real one (`../src/markdown`), but nothing
-// after it is: the document never changes here, so the DOM is written once
-// instead of patched, and no scrolling is synchronised.
+// The rendering pipeline is the real one, but nothing after it is: the
+// document never changes here, so the DOM is written once instead of patched,
+// and no scrolling is synchronised.
 import { drawDiagrams } from "../src/diagram";
 import { createHighlighter } from "../src/highlight";
 import { collectLanguages, createMarkdown } from "../src/markdown";
+import { createSanitizer } from "../src/sanitize";
 import sample from "./sample.md" with { type: "text" };
 
 const container = document.getElementById("mop-content") as HTMLElement;
@@ -20,5 +21,5 @@ const md = createMarkdown(highlighter, "");
 // before the synchronous md.render() below.
 await highlighter.loadLanguages(collectLanguages(md, sample));
 
-container.innerHTML = md.render(sample);
+container.replaceChildren(createSanitizer(window, "")(md.render(sample)));
 void drawDiagrams(container);

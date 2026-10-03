@@ -1,11 +1,12 @@
 // Entry point of the preview page.
 //
-// Everything the daemon sends is raw Markdown; parsing, highlighting, DOM
-// patching and scrolling all happen here.
+// Everything the daemon sends is raw Markdown; parsing, highlighting,
+// sanitizing, DOM patching and scrolling all happen here.
 import { drawDiagrams } from "./diagram";
 import { createHighlighter } from "./highlight";
 import { collectLanguages, createMarkdown } from "./markdown";
 import { patch } from "./patch";
+import { createSanitizer } from "./sanitize";
 import { scrollToLine } from "./scroll";
 
 type RefreshEvent = {
@@ -42,14 +43,16 @@ async function main(): Promise<void> {
   // The highlighter is built once, before the first render, so every render
   // afterwards is a synchronous call and the page never repaints in stages.
   const highlighter = await createHighlighter();
-  const md = createMarkdown(highlighter, `/doc/${docId}/file`);
+  const fileEndpoint = `/doc/${docId}/file`;
+  const md = createMarkdown(highlighter, fileEndpoint);
+  const sanitize = createSanitizer(window, fileEndpoint);
 
   const render = async (content: string) => {
     // Shiki grammars are loaded lazily, so whatever the fences and
     // frontmatter in this content need has to be in before the synchronous
     // md.render() below.
     await highlighter.loadLanguages(collectLanguages(md, content));
-    patch(container, md.render(content));
+    patch(container, sanitize(md.render(content)));
     // Diagrams are drawn after the patch, and their loading is not waited
     // for: the text should not be held back by a diagram library.
     void drawDiagrams(container);
